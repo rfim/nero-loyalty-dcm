@@ -44,3 +44,48 @@ entities:
     main_file: platform_lead_assistant.py
     artifacts: [platform_lead_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
     title: "Nero Platform Assistant"
+
+  nero_ceo_assistant:
+    type: streamlit
+    identifier: {name: CEO_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: ceo_assistant.py
+    artifacts: [ceo_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero CEO Assistant"
+
+  nero_cx_assistant:
+    type: streamlit
+    identifier: {name: CX_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: cx_assistant.py
+    artifacts: [cx_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero CX Assistant"
+
+  nero_cdo_assistant:
+    type: streamlit
+    identifier: {name: CDO_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: cdo_assistant.py
+    artifacts: [cdo_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Data Assistant"
+
+  nero_audit_assistant:
+    type: streamlit
+    identifier: {name: AUDIT_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: audit_assistant.py
+    artifacts: [audit_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Audit Assistant"
+
+  nero_regional_assistant:
+    type: streamlit
+    identifier: {name: REGIONAL_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: regional_assistant.py
+    artifacts: [regional_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Regional Assistant"
