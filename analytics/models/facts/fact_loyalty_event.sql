@@ -46,6 +46,10 @@ select
         reward_key,
         case when reward_id is null then '-2' else '-1' end
     ) as reward_key,
+    -- raw reward_id carried through as a degenerate attribute: dim_reward
+    -- never actually resolves a real ID (it's a shell, no reward master),
+    -- so reporting "by reward" has to group on this, not on reward_key.
+    reward_id,
     event_type,
     1 as event_count,
     case when event_type = 'signup' then 1 else 0 end as signup_count,
