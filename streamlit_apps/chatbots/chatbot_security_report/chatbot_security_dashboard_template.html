@@ -125,10 +125,11 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.
     ? '<tbody><tr><td style="color:var(--ink-muted)">No grants found.</td></tr></tbody>'
     : `<thead><tr><th>Object</th><th>Type</th><th>Privilege</th><th>Granted to role</th></tr></thead>
       <tbody>${DATA.grants.map(g => `<tr><td class="name">${g.object_name}</td><td>${g.object_type}</td><td>${g.privilege}</td><td>${g.grantee}</td></tr>`).join('')}</tbody>`;
-  const nonStandard = DATA.grants.filter(g => !['ACCOUNTADMIN', 'NERO_BI_ROLE', 'NERO_COPILOT_ROLE'].includes(g.grantee) && g.privilege !== 'OWNERSHIP');
+  const EXPECTED_GRANTEES = ['ACCOUNTADMIN', 'NERO_BI_ROLE', 'NERO_GOVERNANCE_ROLE', 'NERO_COPILOT_ROLE'];
+  const nonStandard = DATA.grants.filter(g => !EXPECTED_GRANTEES.includes(g.grantee) && g.privilege !== 'OWNERSHIP');
   document.getElementById('grantsNote').innerHTML = nonStandard.length > 0
-    ? `<b>⚑ Unexpected grantee(s):</b> ${nonStandard.map(g => g.grantee).join(', ')} — outside the three roles expected to hold access to chatbot tools (ACCOUNTADMIN as owner, NERO_BI_ROLE, NERO_COPILOT_ROLE). Worth reviewing.`
-    : `<b>✓ Access matches expectations.</b> Only ACCOUNTADMIN (owner), NERO_BI_ROLE and NERO_COPILOT_ROLE hold access to any chatbot tool — no unexpected grantees.`;
+    ? `<b>⚑ Unexpected grantee(s):</b> ${nonStandard.map(g => g.grantee).join(', ')} — outside the roles expected to hold access to chatbot tools (${EXPECTED_GRANTEES.join(', ')}). Worth reviewing.`
+    : `<b>✓ Access matches expectations.</b> Only ${EXPECTED_GRANTEES.join(', ')} hold access to any chatbot tool — no unexpected grantees.`;
 })();
 
 (function () {

@@ -3,9 +3,5 @@ out/
 *.pem
 .snowflake/
 __pycache__/
-streamlit_app/output/
-governance_app/output/
-chatbot_app/output/
-chatbot_governance_app/output/
-governance_chatbot_app/output/
-leader_chatbots_app/output/
+streamlit_apps/output/
+streamlit_apps/**/output/
