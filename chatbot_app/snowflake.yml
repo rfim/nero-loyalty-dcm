@@ -1,0 +1,15 @@
+definition_version: "2"
+entities:
+  nero_assistant:
+    type: streamlit
+    identifier:
+      name: NERO_ASSISTANT
+      schema: APPS
+      database: NERO_GOVERNANCE
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: nero_assistant.py
+    artifacts:
+      - nero_assistant.py
+      - requirements.txt
+    title: "Nero Assistant"
