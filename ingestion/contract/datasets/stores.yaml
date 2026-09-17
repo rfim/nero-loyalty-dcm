@@ -1,0 +1,8 @@
+primary_key: [store_id]
+owners: {source_owner: store-ops-platform, consumer_owner: data-platform-team}
+columns:
+  store_id:    {type: integer, nullable: false, example: 1042}
+  store_name:  {type: string,  nullable: false, max_length: 200, example: "Manchester Deansgate"}
+  region:      {type: string,  nullable: false, max_length: 100, example: "North West"}
+  format:      {type: string,  nullable: false, enum: [High street, Drive-thru, Travel], example: "High street"}
+  opened_date: {type: date,    nullable: false, example: "2019-03-11"}

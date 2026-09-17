@@ -1,0 +1,7 @@
+primary_key: [customer_id]
+owners: {source_owner: loyalty-platform, consumer_owner: marketing-analytics}
+columns:
+  customer_id:   {type: integer, nullable: false, pii: true, pii_kind: identifier, example: 55291}
+  signup_date:   {type: date,    nullable: false, example: "2026-05-02"}
+  tier:          {type: string,  nullable: false, enum: [Bronze, Silver, Gold], example: "Bronze"}
+  home_store_id: {type: integer, nullable: true, foreign_key: {dataset: stores, column: store_id}, example: 1042}

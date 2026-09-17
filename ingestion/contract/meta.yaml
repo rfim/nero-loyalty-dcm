@@ -1,0 +1,33 @@
+version: 3
+contract_id: nero_loyalty_contract
+wire_format: nero_snapshot_v2
+
+# Platform-level ingestion config, merged in from the guide's separate
+# deployment.yaml. Shared across all datasets — they all land in one
+# RAW_ENVELOPES table via one stage. Only source.type=internal_stage +
+# landing.type=native is deployed/tested — the s3 block is schema-valid and
+# the generator emits real SQL for it, but it's UNVERIFIED (no live AWS
+# credentials in this account).
+ingestion:
+  source:
+    type: internal_stage          # internal_stage | s3
+    file_pattern: ".*[.]jsonl"
+    on_error: ABORT_STATEMENT
+    internal_stage:
+      stage_name: NERO_DB.NERO_LOYALTY.LANDING_STAGE
+    s3:
+      stage_name: NERO_DB.NERO_LOYALTY.S3_STAGE
+      integration_name: NERO_S3_INTEGRATION
+      bucket_url: "s3://REPLACE_BUCKET/nero/"
+      aws_role_arn: "arn:aws:iam::123456789012:role/REPLACE_ROLE"
+      auto_ingest: true
+      pipe_name: NERO_DB.NERO_LOYALTY.CONTRACT_PIPE
+  landing:
+    type: native                  # native | iceberg
+    table_name: NERO_DB.NERO_LOYALTY.RAW_ENVELOPES
+    iceberg:
+      external_volume: SNOWFLAKE_MANAGED
+      base_location: nero/raw/envelopes
+
+freshness:
+  max_snapshot_age_minutes: 60

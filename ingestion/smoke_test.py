@@ -2,17 +2,17 @@
 """Generates 3 synthetic batches (PUBLISHED, REJECTED, INCOMPLETE), uploads each
 to LANDING_STAGE, loads RAW_ENVELOPES, calls PROCESS_BATCH, and prints outcomes.
 
-The PUBLISHED (valid) batch is generated automatically from ingestion/contract.yaml's
-per-column `example` values — adding a dataset to the contract automatically
-extends this scenario with no code change here. REJECTED/INCOMPLETE stay
-hand-crafted since they represent deliberately broken data.
+The PUBLISHED (valid) batch is generated automatically from each dataset's
+`example` column values (ingestion/contract/datasets/*.yaml) — adding a
+dataset to the contract automatically extends this scenario with no code
+change here. REJECTED/INCOMPLETE stay hand-crafted since they represent
+deliberately broken data.
 
 Scoped down from the source guide's 6-scenario suite to 3 representative
 outcomes. Fixtures are synthetic, not derived from the 90-day sample data.
 Usage: python ingestion/smoke_test.py -c <snow_connection_name>
 """
 import argparse
-import hashlib
 import json
 import subprocess
 import sys
@@ -20,11 +20,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
+from contract_loader import load_contract
 
-CONTRACT_PATH = Path(__file__).resolve().parent / "contract.yaml"
-CONTRACT = yaml.safe_load(CONTRACT_PATH.read_text())
-CONTRACT_HASH = hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest()
+CONTRACT, CONTRACT_HASH = load_contract()
 
 
 def envelope(**kwargs):
@@ -48,7 +46,7 @@ def record(batch_id, dataset, row_number, values):
 
 def build_valid_batch(batch_id, captured_at):
     """One example row per dataset, values pulled straight from the contract's
-    `example` fields — adding a dataset to ingestion/contract.yaml with examples
+    `example` fields — adding a dataset file under ingestion/contract/datasets/ with examples
     extends this scenario automatically, no edit needed here."""
     dataset_counts = {name: 1 for name in CONTRACT["datasets"]}
     lines = [manifest(batch_id, dataset_counts, captured_at)]
