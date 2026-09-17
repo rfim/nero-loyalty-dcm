@@ -25,6 +25,13 @@ from snowflake.core import Root
 from snowflake.core.cortex.lite_agent_service._generated.models.agent_run_request import AgentRunRequest
 from snowflake.snowpark.context import get_active_session
 
+import sys as _sys
+from pathlib import Path as _Path
+_p = _Path(__file__).resolve().parent
+while not (_p / "shared").is_dir() and _p != _p.parent:
+    _p = _p.parent
+_sys.path.insert(0, str(_p / "shared"))
+
 import chat_export
 import chat_store
 
@@ -42,7 +49,7 @@ TOOL_DEFS = {
     },
     "governance": {
         "tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "governance_analyst"},
-        "resource": {"semantic_view": "NERO_GOVERNANCE.APPS.GOVERNANCE_SEMANTIC_VIEW",
+        "resource": {"semantic_view": "NERO_GOVERNANCE.CORTEX_TOOLS.GOVERNANCE_SEMANTIC_VIEW",
                      "execution_environment": {"type": "warehouse", "warehouse": WAREHOUSE}},
         "resource_key": "governance_analyst",
         "orchestration": "Use governance_analyst for questions about warehouse credit usage, budgets, or cost by workload.",

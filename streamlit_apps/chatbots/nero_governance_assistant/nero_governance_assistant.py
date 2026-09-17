@@ -1,25 +1,23 @@
-"""Nero Assistant — chat interface over a real Cortex Agent, with
-persistent history, per-result report export, and explicit guardrails.
+"""Nero Governance Assistant — the platform-engineer/admin counterpart to
+chatbot_app/nero_assistant.py's business-facing chat.
 
-Guardrails in effect (see the "Guardrails" panel in the sidebar for the
-user-facing summary):
-  1. Least-privilege execution: this app is owned by NERO_BI_ROLE, a
-     read-only role (SELECT/REFERENCES/USAGE only, no DDL/DML grants
-     anywhere) -- deployed via a session already authenticated as
-     NERO_BI_USER so ownership is assigned correctly at creation time
-     (GRANT OWNERSHIP ON STREAMLIT is not supported by Snowflake, so
-     this is the only way to get a non-ACCOUNTADMIN owner). Even a
-     successful prompt-injection against Cortex Analyst's generated SQL
-     can only ever SELECT.
-  2. Rate limiting: a hard cap on requests per browser session.
-  3. Input bounds: length-capped, trimmed, rejected if empty.
-  4. Parameterized SQL for all history writes (chat_store.py) -- chat
-     content is untrusted input and is never spliced into a query.
-  5. Scoped, explicit system instructions: refuses to take destructive
-     action, stays in the loyalty/security domain, says plainly when a
-     question needs a human decision.
-  6. Full audit trail: every message is persisted
-     (NERO_GOVERNANCE.APPS.CHAT_MESSAGES) with user attribution.
+Streamlit apps in Snowflake always execute with the OWNER's privileges --
+there is no per-viewer "execute as caller" mode (confirmed: `ALTER
+STREAMLIT ... SET EXECUTE_AS = CALLER` is not a supported property). So a
+genuinely "role-based" chatbot can't be one app that adapts per viewer --
+it has to be separate app instances, each owned by a different
+least-privilege role, each scoped to what that role should see. This is
+the governance/admin instance: owned by NERO_GOVERNANCE_ROLE (cost budgets,
+credit usage, security findings, grants, MCP audit log), deployed via a
+session already authenticated as NERO_GOVERNANCE_USER -- exactly the same
+ownership-transfer workaround used for nero_assistant.py, since
+`GRANT OWNERSHIP ON STREAMLIT` isn't supported either.
+
+Guardrails: identical set to nero_assistant.py -- least-privilege
+execution, session rate limit, input bounds, parameterized history writes,
+scoped read-only instructions, full audit trail. See that file's docstring
+for the fuller rationale; not repeated here to avoid drift between two
+copies of the same explanation.
 """
 import json
 from datetime import datetime, timezone
@@ -29,12 +27,19 @@ from snowflake.core import Root
 from snowflake.core.cortex.lite_agent_service._generated.models.agent_run_request import AgentRunRequest
 from snowflake.snowpark.context import get_active_session
 
+import sys as _sys
+from pathlib import Path as _Path
+_p = _Path(__file__).resolve().parent
+while not (_p / "shared").is_dir() and _p != _p.parent:
+    _p = _p.parent
+_sys.path.insert(0, str(_p / "shared"))
+
 import chat_export
 import chat_store
 
-st.set_page_config(page_title="Nero Assistant", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Nero Governance Assistant", layout="wide", initial_sidebar_state="expanded")
 
-SEMANTIC_VIEW = "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW"
+SEMANTIC_VIEW = "NERO_GOVERNANCE.CORTEX_TOOLS.GOVERNANCE_SEMANTIC_VIEW"
 SEARCH_SERVICE = "NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC"
 WAREHOUSE = "NERO_BI_WH"
 
@@ -42,11 +47,11 @@ MAX_MESSAGES_PER_SESSION = 40
 MAX_INPUT_CHARS = 2000
 
 TOOLS = [
-    {"tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "loyalty_analyst"}},
+    {"tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "governance_analyst"}},
     {"tool_spec": {"type": "cortex_search", "name": "findings_search"}},
 ]
 TOOL_RESOURCES = {
-    "loyalty_analyst": {
+    "governance_analyst": {
         "semantic_view": SEMANTIC_VIEW,
         "execution_environment": {"type": "warehouse", "warehouse": WAREHOUSE},
     },
@@ -54,40 +59,41 @@ TOOL_RESOURCES = {
 }
 INSTRUCTIONS = {
     "response": (
-        "You are the Nero Platform assistant. Answer questions about loyalty/sales "
-        "data using loyalty_analyst, and questions about security/Trust Center "
-        "findings using findings_search. Be concise, cite concrete numbers, and say "
-        "plainly when a question needs a human decision (e.g. changing account "
-        "security settings, enrolling users in MFA, editing network policies) "
-        "rather than just data -- you must never claim to have made such a change "
-        "yourself. Stay within the loyalty, sales and security-governance domain; "
-        "decline unrelated requests. You are read-only: you can query and explain "
-        "data, never modify it."
+        "You are the Nero Platform governance assistant, for platform engineers "
+        "and admins. Answer questions about warehouse cost/budget using "
+        "governance_analyst, and security/Trust Center findings using "
+        "findings_search. Be concise, cite concrete numbers, and say plainly when "
+        "a question needs a human decision (e.g. changing account security "
+        "settings, raising a budget, enrolling users in MFA) rather than just "
+        "data -- you must never claim to have made such a change yourself. Stay "
+        "within cost and security governance; decline unrelated requests. You "
+        "are read-only: you can query and explain data, never modify it."
     ),
     "orchestration": (
-        "Use loyalty_analyst for questions about stores, customers, transactions, "
-        "baskets, redemption, or loyalty events. Use findings_search for questions "
-        "about security findings, Trust Center, MFA, network policy, or compliance. "
+        "Use governance_analyst for questions about warehouse credit usage, "
+        "budgets, or cost by workload. Use findings_search for questions about "
+        "security findings, Trust Center, MFA, network policy, or compliance. "
         "Use both if a question spans both topics."
     ),
 }
 
-# ---------------- design ----------------
+# ---------------- design: steel-blue, distinct from the business assistant's
+# espresso/amber identity -- a visual signal that this is the admin surface.
 st.markdown("""
 <style>
 :root {
-  --nero-ink: #2b211c; --nero-ink-secondary: #6b5d52; --nero-ink-muted: #9c8f83;
-  --nero-paper: #faf8f5; --nero-accent: #a8631c; --nero-accent-ink: #7a4712;
-  --nero-wash: #f3e6d4; --nero-rule: #e4dcd2;
+  --nero-ink: #1c2b3a; --nero-ink-secondary: #4c5c6b; --nero-ink-muted: #8a97a3;
+  --nero-paper: #f5f6f8; --nero-accent: #3d5a73; --nero-accent-ink: #2c4256;
+  --nero-wash: #eaeff3; --nero-rule: #d7dde2;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --nero-ink: #f3ece3; --nero-ink-secondary: #cbbdae; --nero-ink-muted: #8a7c6e;
-    --nero-paper: #1a1512; --nero-accent: #d9924a; --nero-accent-ink: #efc292;
-    --nero-wash: #2a2016; --nero-rule: #3a2f26;
+    --nero-ink: #eef1f4; --nero-ink-secondary: #b6c0c9; --nero-ink-muted: #7c8894;
+    --nero-paper: #14191e; --nero-accent: #8fa9bd; --nero-accent-ink: #b7cbd9;
+    --nero-wash: #202a32; --nero-rule: #2c353d;
   }
 }
-h1#nero-title { font-family: "Georgia", "Times New Roman", serif; font-style: italic; font-weight: 600;
+h1#nero-gov-title { font-family: "Georgia", "Times New Roman", serif; font-style: italic; font-weight: 600;
   color: var(--nero-accent-ink); font-size: 30px; margin-bottom: 0; }
 .nero-tagline { color: var(--nero-ink-secondary); font-size: 13.5px; margin-top: 2px; margin-bottom: 18px; }
 [data-testid="stChatMessage"] { border-radius: 14px; padding: 4px 6px; }
@@ -103,7 +109,6 @@ root = Root(session)
 current_user = session.sql("SELECT CURRENT_USER() AS U").collect()[0]["U"]
 
 
-# ---------------- history persistence ----------------
 def ensure_conversation():
     if "conversation_id" not in st.session_state:
         st.session_state.conversation_id = chat_store.new_conversation_id()
@@ -133,7 +138,6 @@ ensure_conversation()
 if "request_count" not in st.session_state:
     st.session_state.request_count = 0
 
-# ---------------- sidebar ----------------
 with st.sidebar:
     st.markdown("### 💬 Conversations")
     if st.button("➕ New chat", use_container_width=True):
@@ -151,17 +155,16 @@ with st.sidebar:
     st.divider()
     with st.expander("🛡️ Guardrails in effect"):
         st.markdown(f"""
-- **Read-only execution** — this app runs under a least-privilege role with no write access anywhere; it can query and explain data, never change it.
+- **Least-privilege, role-scoped** — this app is owned by `NERO_GOVERNANCE_ROLE`, a separate identity from the business assistant's `NERO_BI_ROLE`, with no write access anywhere except its own two history tables.
 - **Rate limited** — max **{MAX_MESSAGES_PER_SESSION}** requests per session.
-- **Scoped domain** — answers loyalty, sales and security-governance questions only; declines the rest.
-- **Human-in-the-loop** — never claims to make security/config changes itself.
-- **Full audit trail** — every message is saved with your user attribution.
+- **Scoped domain** — cost and security governance questions only.
+- **Human-in-the-loop** — never claims to make security/config/budget changes itself.
+- **Full audit trail** — every message saved with your user attribution.
         """)
-    st.caption(f"Signed in as `{current_user}`")
+    st.caption(f"Signed in as `{current_user}` (role: platform governance)")
 
-# ---------------- header ----------------
-st.markdown('<h1 id="nero-title">Nero Assistant</h1>', unsafe_allow_html=True)
-st.markdown('<div class="nero-tagline">Ask about loyalty &amp; sales data or security findings — powered by a real Cortex Agent, the same tools exposed over MCP.</div>', unsafe_allow_html=True)
+st.markdown('<h1 id="nero-gov-title">Nero Governance Assistant</h1>', unsafe_allow_html=True)
+st.markdown('<div class="nero-tagline">Cost budgets, credit usage and security findings — for platform engineers, scoped separately from the business-facing Nero Assistant.</div>', unsafe_allow_html=True)
 
 
 def render_table(placeholder_key: str, columns: list[str], data_rows: list[list], question: str):
@@ -173,14 +176,14 @@ def render_table(placeholder_key: str, columns: list[str], data_rows: list[list]
     with c1:
         st.download_button(
             "⬇ Excel", data=chat_export.build_table_excel(question, columns, data_rows),
-            file_name="nero_assistant_result.xlsx",
+            file_name="nero_governance_result.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"xlsx_{placeholder_key}",
         )
     with c2:
         st.download_button(
             "⬇ PDF", data=chat_export.build_table_pdf(question, columns, data_rows),
-            file_name="nero_assistant_result.pdf", mime="application/pdf",
+            file_name="nero_governance_result.pdf", mime="application/pdf",
             key=f"pdf_{placeholder_key}",
         )
 
@@ -231,7 +234,6 @@ def run_agent(history: list[dict], question: str, msg_index: int):
     return accumulated_text
 
 
-# ---------------- chat rendering ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["text"])
@@ -239,25 +241,23 @@ for msg in st.session_state.messages:
 if not st.session_state.messages:
     st.write("Try asking:")
     suggestions = [
-        "Which store has the highest redemption rate?",
-        "Do Gold-tier customers have a bigger basket than Bronze?",
+        "Which warehouse is closest to its budget?",
         "What open security findings do we have right now?",
+        "How much has CI/CD cost this month?",
     ]
     cols = st.columns(len(suggestions))
     for col, q in zip(cols, suggestions):
         if col.button(q, use_container_width=True):
             st.session_state.pending_input = q
 
-# ---------------- guardrail: rate limit ----------------
 if st.session_state.request_count >= MAX_MESSAGES_PER_SESSION:
     st.warning(f"You've reached the {MAX_MESSAGES_PER_SESSION}-request limit for this session. Start a new chat to continue.")
     prompt = None
 else:
-    prompt = st.chat_input("Ask about stores, loyalty, sales, or security findings...")
+    prompt = st.chat_input("Ask about warehouse costs, budgets, or security findings...")
     if "pending_input" in st.session_state:
         prompt = st.session_state.pop("pending_input")
 
-# ---------------- guardrail: input bounds ----------------
 if prompt is not None:
     prompt = prompt.strip()
     if not prompt:

@@ -2,9 +2,14 @@
 tools and who has actually called them, separate from the platform-wide
 Security & Horizon Governance Report (governance_app/).
 
-Access review runs live SHOW GRANTS ON, not a cached ACCOUNT_USAGE view --
-GRANTS_TO_ROLES lags several hours, and "who can reach this right now" is
-worth getting exactly right rather than approximately right.
+Access review reads NERO_GOVERNANCE.SECURITY.ROLE_GRANTS_INVENTORY (an
+ACCOUNT_USAGE.GRANTS_TO_ROLES wrapper, lags up to a few hours) rather than
+live SHOW GRANTS ON. That's a deliberate trade: SHOW GRANTS ON an object
+requires either owning it or holding the account-wide MANAGE GRANTS
+privilege, which only ACCOUNTADMIN-equivalent roles have -- granting that
+to this app's role just to get a real-time access review would defeat the
+point of a least-privilege reporting role. A few hours of staleness on an
+audit view is the right trade against handing an app MANAGE GRANTS.
 """
 import json
 from datetime import datetime, timezone
@@ -15,6 +20,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 from snowflake.snowpark.context import get_active_session
 
+import sys as _sys
+from pathlib import Path as _Path
+_p = _Path(__file__).resolve().parent
+while not (_p / "shared").is_dir() and _p != _p.parent:
+    _p = _p.parent
+_sys.path.insert(0, str(_p / "shared"))
+
 import report_common as rc
 
 st.set_page_config(page_title="Chatbot Security Governance Report", layout="wide")
@@ -22,11 +34,9 @@ st.set_page_config(page_title="Chatbot Security Governance Report", layout="wide
 session = get_active_session()
 GOV = "NERO_GOVERNANCE"
 
-CHATBOT_OBJECTS = [
-    ("AGENT", "NERO_GOVERNANCE.APPS.NERO_PLATFORM_AGENT"),
-    ("MCP SERVER", "NERO_GOVERNANCE.APPS.NERO_PLATFORM_MCP_SERVER"),
-    ("CORTEX SEARCH SERVICE", "NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC"),
-    ("SEMANTIC VIEW", "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW"),
+CHATBOT_OBJECT_NAMES = [
+    "NERO_PLATFORM_AGENT", "NERO_PLATFORM_MCP_SERVER",
+    "FINDINGS_SEARCH_SVC", "LOYALTY_SEMANTIC_VIEW", "GOVERNANCE_SEMANTIC_VIEW",
 ]
 
 
@@ -36,23 +46,22 @@ def rows(sql: str):
 
 @st.cache_data(ttl=120)
 def load_data():
-    grants = []
-    for obj_type, obj_name in CHATBOT_OBJECTS:
-        try:
-            for r in rows(f"SHOW GRANTS ON {obj_type} {obj_name}"):
-                grants.append({
-                    "object_name": obj_name, "object_type": obj_type,
-                    "privilege": r["privilege"], "grantee": r["grantee_name"],
-                })
-        except Exception:
-            continue
+    placeholders = ", ".join("?" for _ in CHATBOT_OBJECT_NAMES)
+    grant_rows_raw = session.sql(
+        f"""SELECT OBJECT_NAME, GRANTED_ON, PRIVILEGE, ROLE_NAME
+            FROM {GOV}.SECURITY.ROLE_GRANTS_INVENTORY
+            WHERE OBJECT_NAME IN ({placeholders})
+            ORDER BY OBJECT_NAME, ROLE_NAME""",
+        params=CHATBOT_OBJECT_NAMES,
+    ).collect()
+    grants = [
+        {"object_name": r["OBJECT_NAME"], "object_type": r["GRANTED_ON"],
+         "privilege": r["PRIVILEGE"], "grantee": r["ROLE_NAME"]}
+        for r in grant_rows_raw
+    ]
 
-    mcp_registered = False
-    try:
-        mcp_rows = rows("SHOW MCP SERVERS IN ACCOUNT")
-        mcp_registered = any(r["name"] == "NERO_PLATFORM_MCP_SERVER" for r in mcp_rows)
-    except Exception:
-        pass
+    mcp_rows = rows(f"SELECT SERVER_NAME FROM {GOV}.SECURITY.MCP_SERVER_REGISTRY WHERE IS_DISABLED = FALSE")
+    mcp_registered = any(r["SERVER_NAME"] == "NERO_PLATFORM_MCP_SERVER" for r in mcp_rows)
 
     mcp_log_rows = rows(f"SELECT * FROM {GOV}.SECURITY.MCP_TOOL_CALL_LOG LIMIT 100")
     mcp_log = [
@@ -96,7 +105,8 @@ def build_pdf(d: dict) -> bytes:
     mcp_rows = [[r["timestamp"][:19], r["tool_name"], r["user_name"], r["status"]] for r in d["mcp_log"]] or [["—", "—", "—", "No MCP tool calls logged yet"]]
     login_rows = [[r["event_timestamp"][:19], r["user_name"], r["is_success"]] for r in d["logins"]] or [["—", "—", "No chatbot-identity logins in 30 days"]]
 
-    nonstandard = [g for g in d["grants"] if g["grantee"] not in ("ACCOUNTADMIN", "NERO_BI_ROLE", "NERO_COPILOT_ROLE") and g["privilege"] != "OWNERSHIP"]
+    expected_grantees = ("ACCOUNTADMIN", "NERO_BI_ROLE", "NERO_GOVERNANCE_ROLE", "NERO_COPILOT_ROLE")
+    nonstandard = [g for g in d["grants"] if g["grantee"] not in expected_grantees and g["privilege"] != "OWNERSHIP"]
 
     sections = [
         ("Executive Summary", [

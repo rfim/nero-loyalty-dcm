@@ -1,0 +1,183 @@
+definition_version: "2"
+entities:
+  # ---------------- dashboards (NERO_GOVERNANCE.APPS_DASHBOARDS) ----------------
+  loyalty_trading_pulse:
+    type: streamlit
+    identifier: {name: LOYALTY_TRADING_PULSE, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: dashboards/loyalty_trading_pulse/loyalty_trading_pulse.py
+    artifacts:
+      - dashboards/loyalty_trading_pulse/loyalty_trading_pulse.py
+      - dashboards/loyalty_trading_pulse/dashboard_template.html
+    title: "Loyalty & Trading Pulse"
+
+  cost_governance_report:
+    type: streamlit
+    identifier: {name: COST_GOVERNANCE_REPORT, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: dashboards/cost_governance_report/cost_report.py
+    artifacts:
+      - dashboards/cost_governance_report/cost_report.py
+      - dashboards/cost_governance_report/cost_dashboard_template.html
+      - shared/report_common.py
+      - dashboards/cost_governance_report/requirements.txt
+    title: "Cost Governance Report"
+
+  security_governance_report:
+    type: streamlit
+    identifier: {name: SECURITY_GOVERNANCE_REPORT, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: dashboards/security_governance_report/security_report.py
+    artifacts:
+      - dashboards/security_governance_report/security_report.py
+      - dashboards/security_governance_report/security_dashboard_template.html
+      - shared/report_common.py
+      - dashboards/security_governance_report/requirements.txt
+    title: "Security & Horizon Governance Report"
+
+  # ---------------- chatbots (NERO_GOVERNANCE.APPS_CHATBOTS) ----------------
+  nero_assistant:
+    type: streamlit
+    identifier: {name: NERO_ASSISTANT, schema: APPS_CHATBOTS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: chatbots/nero_assistant/nero_assistant.py
+    artifacts:
+      - chatbots/nero_assistant/nero_assistant.py
+      - shared/chat_store.py
+      - shared/chat_export.py
+      - chatbots/nero_assistant/requirements.txt
+    title: "Nero Assistant"
+
+  nero_governance_assistant:
+    type: streamlit
+    identifier: {name: NERO_GOVERNANCE_ASSISTANT, schema: APPS_CHATBOTS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: chatbots/nero_governance_assistant/nero_governance_assistant.py
+    artifacts:
+      - chatbots/nero_governance_assistant/nero_governance_assistant.py
+      - shared/chat_store.py
+      - shared/chat_export.py
+      - chatbots/nero_governance_assistant/requirements.txt
+    title: "Nero Governance Assistant"
+
+  chatbot_cost_report:
+    type: streamlit
+    identifier: {name: CHATBOT_COST_GOVERNANCE_REPORT, schema: APPS_CHATBOTS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: chatbots/chatbot_cost_report/chatbot_cost_report.py
+    artifacts:
+      - chatbots/chatbot_cost_report/chatbot_cost_report.py
+      - chatbots/chatbot_cost_report/chatbot_cost_dashboard_template.html
+      - shared/report_common.py
+      - chatbots/chatbot_cost_report/requirements.txt
+    title: "Chatbot Cost Governance Report"
+
+  chatbot_security_report:
+    type: streamlit
+    identifier: {name: CHATBOT_SECURITY_GOVERNANCE_REPORT, schema: APPS_CHATBOTS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: chatbots/chatbot_security_report/chatbot_security_report.py
+    artifacts:
+      - chatbots/chatbot_security_report/chatbot_security_report.py
+      - chatbots/chatbot_security_report/chatbot_security_dashboard_template.html
+      - shared/report_common.py
+      - chatbots/chatbot_security_report/requirements.txt
+    title: "Chatbot Security Governance Report"
+
+  # ---------------- leaders (NERO_GOVERNANCE.APPS_LEADERS) ----------------
+  marketing_assistant:
+    type: streamlit
+    identifier: {name: MARKETING_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/marketing_assistant.py
+    artifacts: [leaders/marketing_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Marketing Assistant"
+
+  ops_assistant:
+    type: streamlit
+    identifier: {name: OPS_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/ops_assistant.py
+    artifacts: [leaders/ops_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Store Operations Assistant"
+
+  finance_assistant:
+    type: streamlit
+    identifier: {name: FINANCE_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/finance_assistant.py
+    artifacts: [leaders/finance_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Finance Assistant"
+
+  security_lead_assistant:
+    type: streamlit
+    identifier: {name: SECURITY_LEAD_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/security_lead_assistant.py
+    artifacts: [leaders/security_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Security Assistant"
+
+  platform_lead_assistant:
+    type: streamlit
+    identifier: {name: PLATFORM_LEAD_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/platform_lead_assistant.py
+    artifacts: [leaders/platform_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Platform Assistant"
+
+  ceo_assistant:
+    type: streamlit
+    identifier: {name: CEO_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/ceo_assistant.py
+    artifacts: [leaders/ceo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero CEO Assistant"
+
+  cx_assistant:
+    type: streamlit
+    identifier: {name: CX_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/cx_assistant.py
+    artifacts: [leaders/cx_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero CX Assistant"
+
+  cdo_assistant:
+    type: streamlit
+    identifier: {name: CDO_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/cdo_assistant.py
+    artifacts: [leaders/cdo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Data Assistant"
+
+  audit_assistant:
+    type: streamlit
+    identifier: {name: AUDIT_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/audit_assistant.py
+    artifacts: [leaders/audit_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Audit Assistant"
+
+  regional_assistant:
+    type: streamlit
+    identifier: {name: REGIONAL_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: leaders/regional_assistant.py
+    artifacts: [leaders/regional_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    title: "Nero Regional Assistant"

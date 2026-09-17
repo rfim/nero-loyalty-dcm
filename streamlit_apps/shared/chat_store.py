@@ -1,6 +1,6 @@
 """Persistent conversation history for Nero Assistant.
 
-Backed by NERO_GOVERNANCE.APPS.CHAT_CONVERSATIONS / CHAT_MESSAGES
+Backed by NERO_GOVERNANCE.APPS_CHATBOTS.CHAT_CONVERSATIONS / CHAT_MESSAGES
 (account_setup/chat_history_tables.sql). Every write uses bound
 parameters, never string-interpolated SQL -- chat content is arbitrary
 user input and must never be spliced into a query directly.
@@ -8,8 +8,8 @@ user input and must never be spliced into a query directly.
 import uuid
 from datetime import datetime, timezone
 
-CONVERSATIONS = "NERO_GOVERNANCE.APPS.CHAT_CONVERSATIONS"
-MESSAGES = "NERO_GOVERNANCE.APPS.CHAT_MESSAGES"
+CONVERSATIONS = "NERO_GOVERNANCE.APPS_CHATBOTS.CHAT_CONVERSATIONS"
+MESSAGES = "NERO_GOVERNANCE.APPS_CHATBOTS.CHAT_MESSAGES"
 
 
 def new_conversation_id() -> str:
