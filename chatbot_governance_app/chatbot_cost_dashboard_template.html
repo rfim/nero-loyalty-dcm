@@ -1,0 +1,196 @@
+<!doctype html>
+<title>Chatbot Cost Governance Report</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper: #ffffff; --paper-band: #f5f6f8; --ink: #1c2b3a; --ink-secondary: #4c5c6b; --ink-muted: #8a97a3;
+    --rule: #d7dde2; --rule-strong: #b7c1ca; --accent: #3d5a73; --accent-wash: #eaeff3;
+    --status-good: #0ca30c; --status-warn: #b8860b; --status-serious: #c56a3e; --status-crit: #b23a3a;
+    --series-1: #3d5a73; --series-2: #7c8f9e; --series-3: #a8bcc9; --series-4: #c9754a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+      --rule: #2c353d; --rule-strong: #3a444d; --accent: #8fa9bd; --accent-wash: #202a32;
+      --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+      --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66; --series-4: #d99567;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+    --rule: #2c353d; --rule-strong: #3a444d; --accent: #8fa9bd; --accent-wash: #202a32;
+    --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+    --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66; --series-4: #d99567;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper-band); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55; }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1040px; margin: 0 auto; padding: 0 20px 56px; }
+  .titleblock { background: var(--paper); border-bottom: 3px solid var(--accent); padding: 34px 36px 24px; margin-top: 18px; }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 28px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 21px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+  .panel-title { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 11.5px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 11.5px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar-track { fill: var(--accent-wash); }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered { filter: brightness(1.1); }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100; background: var(--paper); border: 1px solid var(--rule-strong);
+    padding: 8px 11px; font-size: 11.5px; box-shadow: 0 6px 18px rgba(20,25,30,0.16); color: var(--ink); max-width: 240px;
+    transform: translate(-50%, -100%); opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 700; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  .tbl-wrap { overflow-x: auto; }
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block b { color: var(--ink); }
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <div class="kicker">Nero Platform &middot; Chatbot Governance</div>
+    <h1>Chatbot Cost Governance Report</h1>
+    <p class="sub">What the Nero Assistant chatbot (Cortex Agent, Analyst, Search) actually costs, by user and by day — read live from NERO_GOVERNANCE.COST.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
+      <div class="meta-item"><div class="k">Credit rate</div><div class="v" id="metaRate"></div></div>
+      <div class="meta-item"><div class="k">Requests tracked</div><div class="v" id="metaRequests"></div></div>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section">
+    <span class="section-num">1.</span><span class="section-title">Agent usage by caller</span>
+    <p class="section-sub">Cortex Agent lite-run credit/token usage. The chatbot's own Streamlit service identity (STPLATSTREAMLIT...) means someone used the chat UI; other users reflect direct/API access.</p>
+    <div class="panel-title">Credits by user</div>
+    <svg id="chartUserCredits" class="barchart"></svg>
+    <div class="tbl-wrap"><table class="datatable" id="userTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">2.</span><span class="section-title">Underlying tool usage</span>
+    <p class="section-sub">Cortex Analyst and Cortex Search credits — the two tools the agent calls on the chatbot's behalf.</p>
+    <div class="tbl-wrap"><table class="datatable" id="toolTable"></table></div>
+    <div class="note-block" id="toolNote"></div>
+  </section>
+
+  <footer>
+    <p>Sources: SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY, CORTEX_ANALYST_USAGE_HISTORY, CORTEX_SEARCH_DAILY_USAGE_HISTORY, wrapped by NERO_GOVERNANCE.COST. These carry replication latency of up to several hours.</p>
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add('show'); positionTip(evt); }
+function positionTip(evt) { tooltip.style.left = evt.clientX + 'px'; tooltip.style.top = (evt.clientY - 14) + 'px'; }
+function hideTip() { tooltip.classList.remove('show'); }
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtCredits = (v) => v == null ? '—' : v.toFixed(4);
+const fmtUsd = (v) => v == null ? '—' : '$' + v.toFixed(2);
+
+function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, height }) {
+  const n = rows.length, rowH = height || 32, labelW = 160, valueW = 70, chartW = 320;
+  const totalW = labelW + chartW + valueW, totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  const max = Math.max(...rows.map(valueFn), 0.0001) * 1.15;
+  svgEl.innerHTML = '';
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4, v = valueFn(row), w = Math.max((v / max) * chartW, 2);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8); label.setAttribute('y', y + rowH / 2 - 4); label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = labelFn(row); svgEl.appendChild(label);
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW); track.setAttribute('y', y); track.setAttribute('width', chartW); track.setAttribute('height', rowH - 10);
+    track.setAttribute('class', 'bar-track'); svgEl.appendChild(track);
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW); fill.setAttribute('y', y); fill.setAttribute('width', w); fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('fill', typeof color === 'function' ? color(row) : color); fill.setAttribute('class', 'bar-fill'); svgEl.appendChild(fill);
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10); vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label'); vLabel.textContent = fmtFn(v); svgEl.appendChild(vLabel);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2); hit.setAttribute('width', totalW); hit.setAttribute('height', rowH); hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, `<div class="t-title">${labelFn(row)}</div><div class="t-row"><span>Credits</span><b>${fmtCredits(v)}</b></div>`); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+document.getElementById('metaGenerated').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+document.getElementById('metaRate').textContent = `$${DATA.credit_rate.toFixed(2)} / credit`;
+document.getElementById('metaRequests').textContent = DATA.total_requests;
+
+const kpis = [
+  { label: 'Total chatbot spend', value: fmtUsd(DATA.total_usd), note: `${fmtCredits(DATA.total_credits)} credits` },
+  { label: 'Requests (agent calls)', value: fmtInt(DATA.total_requests), note: 'CORTEX_AGENT_USAGE_HISTORY rows' },
+  { label: 'Avg. cost / request', value: fmtUsd(DATA.total_requests ? DATA.total_usd / DATA.total_requests : 0), note: 'lifetime average' },
+  { label: 'Unique callers', value: fmtInt(DATA.by_user.length), note: 'distinct users/service identities' },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+
+(function () {
+  const rows = [...DATA.by_user].sort((a, b) => b.credits - a.credits);
+  if (rows.length === 0) {
+    document.getElementById('chartUserCredits').outerHTML = '<p style="color:var(--ink-muted)">No agent usage recorded yet.</p>';
+    document.getElementById('userTable').innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No data.</td></tr></tbody>';
+  } else {
+    renderBarChart(document.getElementById('chartUserCredits'), rows, {
+      valueFn: r => r.credits, labelFn: r => r.user_name, fmtFn: v => fmtCredits(v), color: 'var(--series-1)'.replace('var(','').replace(')',''),
+    });
+    document.getElementById('userTable').innerHTML = `<thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Credits</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.user_name}</td><td>${fmtInt(r.request_count)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtCredits(r.credits)}</td></tr>`).join('')}</tbody>`;
+  }
+})();
+
+(function () {
+  const rows = DATA.tool_usage;
+  const tt = document.getElementById('toolTable');
+  if (rows.length === 0) {
+    tt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No standalone Cortex Analyst/Search usage recorded (the agent may bundle their cost into its own request credits).</td></tr></tbody>';
+  } else {
+    tt.innerHTML = `<thead><tr><th>Tool</th><th>Credits</th><th>Requests</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
+  }
+  document.getElementById('toolNote').innerHTML = `<b>Why this might be empty even with agent usage above:</b> when Cortex Analyst/Search are called <em>through</em> an agent's lite-run request, Snowflake may attribute the full cost to CORTEX_AGENT_USAGE_HISTORY rather than logging a separate line here. Section 1 is the authoritative total; this section is a supplementary breakdown when Snowflake does log it separately.`;
+})();
+
+document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });
+</script>

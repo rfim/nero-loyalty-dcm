@@ -1,0 +1,149 @@
+<!doctype html>
+<title>Chatbot Security Governance Report</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper: #ffffff; --paper-band: #f5f6f8; --ink: #1c2b3a; --ink-secondary: #4c5c6b; --ink-muted: #8a97a3;
+    --rule: #d7dde2; --rule-strong: #b7c1ca; --accent: #6b3d43; --accent-wash: #f3eaeb;
+    --status-good: #0ca30c; --status-warn: #b8860b; --status-serious: #c56a3e; --status-crit: #b23a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+      --rule: #2c353d; --rule-strong: #3a444d; --accent: #c98f95; --accent-wash: #2a1f21;
+      --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+    --rule: #2c353d; --rule-strong: #3a444d; --accent: #c98f95; --accent-wash: #2a1f21;
+    --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper-band); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55; }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1040px; margin: 0 auto; padding: 0 20px 56px; }
+  .titleblock { background: var(--paper); border-bottom: 3px solid var(--accent); padding: 34px 36px 24px; margin-top: 18px; }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 28px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 21px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  .kpi.flag .value { color: var(--status-crit); }
+  .kpi.good .value { color: var(--status-good); }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  .tbl-wrap { overflow-x: auto; }
+  .badge { display: inline-block; padding: 2px 9px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: 1px solid; }
+  .badge.good { color: var(--status-good); border-color: var(--status-good); }
+  .badge.crit { color: var(--status-crit); border-color: var(--status-crit); }
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block b { color: var(--ink); }
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <div class="kicker">Nero Platform &middot; Chatbot Governance</div>
+    <h1>Chatbot Security Governance Report</h1>
+    <p class="sub">Who can reach the Nero Assistant's tools, who has actually called them, and whether the MCP server is live — read live from Snowflake, not a cached view.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
+      <div class="meta-item"><div class="k">MCP server</div><div class="v" id="metaMcpStatus"></div></div>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section">
+    <span class="section-num">1.</span><span class="section-title">Who can reach the chatbot's tools</span>
+    <p class="section-sub">Live SHOW GRANTS ON the MCP server, agent, search service and semantic view — not a cached ACCOUNT_USAGE snapshot, so this reflects the current state exactly.</p>
+    <div class="tbl-wrap"><table class="datatable" id="grantsTable"></table></div>
+    <div class="note-block" id="grantsNote"></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">2.</span><span class="section-title">MCP tool-call audit log</span>
+    <p class="section-sub">Every invocation against NERO_PLATFORM_MCP_SERVER — who, what tool, when, and whether it succeeded.</p>
+    <div class="tbl-wrap"><table class="datatable" id="mcpLogTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">3.</span><span class="section-title">Recent logins, chatbot-related identities</span>
+    <p class="section-sub">NERO_COPILOT_USER, NERO_BI_USER, and the chatbot app's own Streamlit service identities — last 30 days.</p>
+    <div class="tbl-wrap"><table class="datatable" id="loginTable"></table></div>
+  </section>
+
+  <footer>
+    <p>Sources: live SHOW GRANTS / SHOW MCP SERVERS, SNOWFLAKE.TRUST_CENTER.MCP_SERVER_EVENTS, SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY, wrapped by NERO_GOVERNANCE.SECURITY where noted.</p>
+  </footer>
+</div>
+
+<script>
+const DATA = __DATA_JSON__;
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtDate = (s) => s == null ? '—' : new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+document.getElementById('metaGenerated').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+document.getElementById('metaMcpStatus').textContent = DATA.mcp_registered ? 'Registered & live' : 'Not found';
+
+const kpis = [
+  { label: 'MCP server', value: DATA.mcp_registered ? 'Live' : 'Missing', note: 'NERO_PLATFORM_MCP_SERVER', cls: DATA.mcp_registered ? 'good' : 'flag' },
+  { label: 'Grants on chatbot objects', value: fmtInt(DATA.grants.length), note: 'agent, MCP server, search, semantic view' },
+  { label: 'MCP tool calls logged', value: fmtInt(DATA.mcp_log.length), note: DATA.mcp_log.length === 0 ? 'no external client connected yet' : 'total invocations' },
+  { label: 'Chatbot logins, 30d', value: fmtInt(DATA.logins.length), note: 'NERO_COPILOT_USER / NERO_BI_USER / app identities' },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.cls ? ' ' + k.cls : ''}"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+
+(function () {
+  const gt = document.getElementById('grantsTable');
+  gt.innerHTML = DATA.grants.length === 0
+    ? '<tbody><tr><td style="color:var(--ink-muted)">No grants found.</td></tr></tbody>'
+    : `<thead><tr><th>Object</th><th>Type</th><th>Privilege</th><th>Granted to role</th></tr></thead>
+      <tbody>${DATA.grants.map(g => `<tr><td class="name">${g.object_name}</td><td>${g.object_type}</td><td>${g.privilege}</td><td>${g.grantee}</td></tr>`).join('')}</tbody>`;
+  const nonStandard = DATA.grants.filter(g => !['ACCOUNTADMIN', 'NERO_BI_ROLE', 'NERO_COPILOT_ROLE'].includes(g.grantee) && g.privilege !== 'OWNERSHIP');
+  document.getElementById('grantsNote').innerHTML = nonStandard.length > 0
+    ? `<b>⚑ Unexpected grantee(s):</b> ${nonStandard.map(g => g.grantee).join(', ')} — outside the three roles expected to hold access to chatbot tools (ACCOUNTADMIN as owner, NERO_BI_ROLE, NERO_COPILOT_ROLE). Worth reviewing.`
+    : `<b>✓ Access matches expectations.</b> Only ACCOUNTADMIN (owner), NERO_BI_ROLE and NERO_COPILOT_ROLE hold access to any chatbot tool — no unexpected grantees.`;
+})();
+
+(function () {
+  const mt = document.getElementById('mcpLogTable');
+  mt.innerHTML = DATA.mcp_log.length === 0
+    ? '<tbody><tr><td style="color:var(--ink-muted)">No MCP tool calls logged yet — expected until an external MCP client (e.g. Copilot) actually connects and calls a tool.</td></tr></tbody>'
+    : `<thead><tr><th>Time</th><th>Tool</th><th>User</th><th>Role</th><th>Status</th></tr></thead>
+      <tbody>${DATA.mcp_log.map(r => `<tr><td>${fmtDate(r.timestamp)}</td><td class="name">${r.tool_name}</td><td>${r.user_name}</td><td>${r.role_name}</td><td><span class="badge ${r.status === 'SUCCESS' ? 'good' : 'crit'}">${r.status}</span></td></tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const lt = document.getElementById('loginTable');
+  lt.innerHTML = DATA.logins.length === 0
+    ? '<tbody><tr><td style="color:var(--ink-muted)">No logins from chatbot-related identities in the last 30 days.</td></tr></tbody>'
+    : `<thead><tr><th>Time</th><th>User</th><th>Success</th><th>Client</th></tr></thead>
+      <tbody>${DATA.logins.map(r => `<tr><td>${fmtDate(r.event_timestamp)}</td><td class="name">${r.user_name}</td><td><span class="badge ${r.is_success === 'YES' ? 'good' : 'crit'}">${r.is_success}</span></td><td>${r.client_type || '—'}</td></tr>`).join('')}</tbody>`;
+})();
+</script>
