@@ -11,5 +11,7 @@ entities:
     main_file: nero_assistant.py
     artifacts:
       - nero_assistant.py
+      - chat_export.py
+      - chat_store.py
       - requirements.txt
     title: "Nero Assistant"
