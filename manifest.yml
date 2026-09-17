@@ -1,0 +1,9 @@
+manifest_version: 2
+type: DCM_PROJECT
+default_target: 'DEV'
+
+targets:
+  DEV:
+    account_identifier: PEGSZYG-IF37362
+    project_name: 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT'
+    project_owner: ACCOUNTADMIN
