@@ -1,0 +1,43 @@
+name: DCM Validate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli
+
+      - name: Configure Snowflake connection
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.snowflake/keys
+          echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/keys/rsa_key.p8
+          chmod 600 ~/.snowflake/keys/rsa_key.p8
+          snow connection add \
+            --connection-name ci \
+            --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            --user "${{ secrets.SNOWFLAKE_USER }}" \
+            --role "${{ secrets.SNOWFLAKE_ROLE }}" \
+            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            --database "${{ secrets.SNOWFLAKE_DATABASE }}" \
+            --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            --authenticator SNOWFLAKE_JWT \
+            --private-key ~/.snowflake/keys/rsa_key.p8 \
+            --default \
+            --no-interactive
+
+      - name: DCM analyze (validate only, no deploy)
+        run: |
+          snow dcm raw-analyze 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci
