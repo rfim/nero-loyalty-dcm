@@ -4,3 +4,6 @@ channels:
 dependencies:
   - streamlit
   - snowflake-snowpark-python
+  - pandas
+  - reportlab
+  - xlsxwriter

@@ -1,0 +1,257 @@
+<!doctype html>
+<title>Security & Horizon Governance Report</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper: #ffffff; --paper-band: #f5f6f8; --ink: #1c2b3a; --ink-secondary: #4c5c6b; --ink-muted: #8a97a3;
+    --rule: #d7dde2; --rule-strong: #b7c1ca; --accent: #6b3d43; --accent-wash: #f3eaeb;
+    --status-good: #0ca30c; --status-warn: #b8860b; --status-serious: #c56a3e; --status-crit: #b23a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+      --rule: #2c353d; --rule-strong: #3a444d; --accent: #c98f95; --accent-wash: #2a1f21;
+      --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9; --ink-muted: #7c8894;
+    --rule: #2c353d; --rule-strong: #3a444d; --accent: #c98f95; --accent-wash: #2a1f21;
+    --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper-band); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55; }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1040px; margin: 0 auto; padding: 0 20px 56px; }
+
+  .titleblock { background: var(--paper); border-bottom: 3px solid var(--accent); padding: 34px 36px 24px; margin-top: 18px; }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 21px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  .kpi.flag .value { color: var(--status-crit); }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 30px; margin-top: 18px; align-items: start; }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+  .panel-title { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 11.5px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 11.5px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar-track { fill: var(--accent-wash); }
+  .axis-line { stroke: var(--rule-strong); stroke-width: 1; }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered { filter: brightness(1.1); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100; background: var(--paper); border: 1px solid var(--rule-strong);
+    padding: 8px 11px; font-size: 11.5px; box-shadow: 0 6px 18px rgba(20,25,30,0.16); color: var(--ink); max-width: 260px;
+    transform: translate(-50%, -100%); opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 700; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-block; padding: 2px 9px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: 1px solid; }
+  .badge.CRITICAL { color: var(--status-crit); border-color: var(--status-crit); }
+  .badge.HIGH { color: var(--status-serious); border-color: var(--status-serious); }
+  .badge.MEDIUM { color: var(--status-warn); border-color: var(--status-warn); }
+  .badge.LOW { color: var(--ink-muted); border-color: var(--rule-strong); }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; vertical-align: top; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  table.datatable td.desc { font-variant-numeric: normal; color: var(--ink-secondary); max-width: 420px; }
+  .tbl-wrap { overflow-x: auto; }
+
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block.crit { border-color: var(--status-crit); }
+  .note-block b { color: var(--ink); }
+
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <div class="kicker">Nero Platform &middot; Governance Series</div>
+    <h1>Security &amp; Horizon Governance Report</h1>
+    <p class="sub">Open findings from Snowflake's Trust Center scanners, current role-grant and login posture — read directly from NERO_GOVERNANCE.SECURITY.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Report period</div><div class="v" id="metaPeriod"></div></div>
+      <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
+      <div class="meta-item"><div class="k">Open findings</div><div class="v" id="metaOpen"></div></div>
+      <div class="meta-item"><div class="k">ACCOUNTADMIN holders</div><div class="v" id="metaAdmins"></div></div>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section">
+    <span class="section-num">1.</span><span class="section-title">Open Horizon / Trust Center findings</span>
+    <p class="section-sub">Snowflake's built-in scanners — MFA readiness, network policy coverage, client CVEs, admin-grant changes — currently unresolved.</p>
+    <div class="grid-2">
+      <div><div class="panel-title">By severity</div><svg id="chartSeverity" class="barchart"></svg></div>
+      <div><div class="panel-title">All-time volume, open vs. resolved</div><svg id="chartHistory" class="barchart"></svg></div>
+    </div>
+    <div class="tbl-wrap"><table class="datatable" id="findingsTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">2.</span><span class="section-title">Least-privilege posture</span>
+    <p class="section-sub">Every user currently holding ACCOUNTADMIN, and the account's password/MFA-related account parameters.</p>
+    <div class="tbl-wrap"><table class="datatable" id="adminTable"></table></div>
+    <div class="note-block" id="adminNote"></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">3.</span><span class="section-title">Role grant inventory</span>
+    <p class="section-sub">Current (non-revoked) privilege grants, grouped by role — the base inventory for any access review.</p>
+    <div class="tbl-wrap"><table class="datatable" id="grantsTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">4.</span><span class="section-title">Login activity, last 30 days</span>
+    <p class="section-sub">Failed-login attempts by day — a spike or burst of distinct source IPs against one user is the signal worth chasing.</p>
+    <div class="tbl-wrap"><table class="datatable" id="loginTable"></table></div>
+  </section>
+
+  <footer>
+    <p>Sources: SNOWFLAKE.TRUST_CENTER.FINDINGS, SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY / GRANTS_TO_ROLES / GRANTS_TO_USERS, wrapped by NERO_GOVERNANCE.SECURITY. ACCOUNT_USAGE carries replication latency of up to a few hours.</p>
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add('show'); positionTip(evt); }
+function positionTip(evt) { tooltip.style.left = evt.clientX + 'px'; tooltip.style.top = (evt.clientY - 14) + 'px'; }
+function hideTip() { tooltip.classList.remove('show'); }
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtDate = (s) => s == null ? '—' : new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, height }) {
+  const n = rows.length, rowH = height || 34, labelW = 100, valueW = 50, chartW = 340;
+  const totalW = labelW + chartW + valueW, totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  const max = Math.max(...rows.map(valueFn), 0.0001) * 1.15;
+  svgEl.innerHTML = '';
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4, v = valueFn(row), w = Math.max((v / max) * chartW, 2);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8); label.setAttribute('y', y + rowH / 2 - 4); label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = labelFn(row); svgEl.appendChild(label);
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW); track.setAttribute('y', y); track.setAttribute('width', chartW); track.setAttribute('height', rowH - 10);
+    track.setAttribute('class', 'bar-track'); svgEl.appendChild(track);
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW); fill.setAttribute('y', y); fill.setAttribute('width', w); fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('fill', typeof color === 'function' ? color(row) : color); fill.setAttribute('class', 'bar-fill'); svgEl.appendChild(fill);
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10); vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label'); vLabel.textContent = fmtFn(v); svgEl.appendChild(vLabel);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2); hit.setAttribute('width', totalW); hit.setAttribute('height', rowH); hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, `<div class="t-title">${labelFn(row)}</div><div class="t-row"><span>Count</span><b>${fmtInt(v)}</b></div>`); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+document.getElementById('metaPeriod').textContent = `${fmtDate(DATA.period_start)} – ${fmtDate(DATA.period_end)}`;
+document.getElementById('metaGenerated').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+document.getElementById('metaOpen').textContent = DATA.security.open_count;
+document.getElementById('metaAdmins').textContent = DATA.security.accountadmin_count;
+
+const kpis = [
+  { label: 'Open findings', value: fmtInt(DATA.security.open_count), note: `${DATA.security.open_critical} critical/high`, flag: DATA.security.open_critical > 0 },
+  { label: 'Critical open', value: fmtInt(DATA.security.open_by_severity.CRITICAL || 0), note: 'requires immediate action', flag: (DATA.security.open_by_severity.CRITICAL || 0) > 0 },
+  { label: 'ACCOUNTADMIN holders', value: fmtInt(DATA.security.accountadmin_count), note: 'least-privilege check', flag: DATA.security.accountadmin_count > 0 },
+  { label: 'Network policy', value: DATA.security.network_policy_set ? 'Configured' : 'Not set', note: 'account-level IP allowlist', flag: !DATA.security.network_policy_set },
+  { label: 'Failed logins, 30d', value: fmtInt(DATA.security.failed_logins_30d), note: `${DATA.security.failed_login_users} distinct user(s)` },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.flag ? ' flag' : ''}"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+
+(function () {
+  const good = getComputedStyle(document.documentElement).getPropertyValue('--status-good').trim();
+  const warn = getComputedStyle(document.documentElement).getPropertyValue('--status-warn').trim();
+  const serious = getComputedStyle(document.documentElement).getPropertyValue('--status-serious').trim();
+  const crit = getComputedStyle(document.documentElement).getPropertyValue('--status-crit').trim();
+  const sevColor = { CRITICAL: crit, HIGH: serious, MEDIUM: warn, LOW: good };
+  const sevOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+  const sevRows = Object.entries(DATA.security.open_by_severity).map(([sev, n]) => ({ severity: sev, count: n }))
+    .sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
+  renderBarChart(document.getElementById('chartSeverity'), sevRows, { valueFn: r => r.count, labelFn: r => r.severity, fmtFn: v => fmtInt(v), color: r => sevColor[r.severity] || good });
+
+  renderBarChart(document.getElementById('chartHistory'), DATA.security.findings_history, {
+    valueFn: r => r.open + r.resolved, labelFn: r => r.severity, fmtFn: v => fmtInt(v), color: r => sevColor[r.severity] || good,
+  });
+
+  const ft = document.getElementById('findingsTable');
+  ft.innerHTML = DATA.security.open_findings.length === 0
+    ? `<tbody><tr><td style="color:var(--ink-muted)">No open findings.</td></tr></tbody>`
+    : `<thead><tr><th>Scanner</th><th>Severity</th><th>Risk</th><th>Opened</th></tr></thead>
+      <tbody>${DATA.security.open_findings.map(f => `<tr>
+        <td class="name">${f.scanner_name}</td><td><span class="badge ${f.severity}">${f.severity}</span></td>
+        <td class="desc">${(f.risk_description || '').trim().slice(0, 240)}${(f.risk_description || '').length > 240 ? '…' : ''}</td>
+        <td>${fmtDate(f.created_on)}</td>
+      </tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const at = document.getElementById('adminTable');
+  at.innerHTML = `<thead><tr><th>User</th><th>Role</th><th>Granted</th></tr></thead>
+    <tbody>${DATA.security.accountadmin_holders.map(a => `<tr><td class="name">${a.user_name}</td><td>${a.granted_role}</td><td>${fmtDate(a.created_on)}</td></tr>`).join('')}</tbody>`;
+  document.getElementById('adminNote').innerHTML = DATA.security.accountadmin_count <= 1
+    ? `<b>Single-identity risk.</b> ${DATA.security.accountadmin_count} user runs ingestion, CI/CD and dbt under ACCOUNTADMIN. Splitting into per-workload least-privilege service roles is the standing recommendation — see the Cost Governance Report §2 for the matching cost-attribution gap this causes.`
+    : `${DATA.security.accountadmin_count} users hold ACCOUNTADMIN.`;
+})();
+
+(function () {
+  const gt = document.getElementById('grantsTable');
+  const rows = DATA.security.grants_by_role;
+  gt.innerHTML = `<thead><tr><th>Role</th><th>Privilege</th><th>Object type</th><th>Count</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td class="name">${r.role}</td><td>${r.privilege}</td><td>${r.granted_on}</td><td>${fmtInt(r.count)}</td></tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const lt = document.getElementById('loginTable');
+  const rows = DATA.security.login_daily;
+  lt.innerHTML = rows.length === 0
+    ? `<tbody><tr><td style="color:var(--ink-muted)">No login activity in the last 30 days.</td></tr></tbody>`
+    : `<thead><tr><th>Date</th><th>Successful</th><th>Failed</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${fmtInt(r.success)}</td><td>${fmtInt(r.failed)}</td></tr>`).join('')}</tbody>`;
+})();
+
+document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });
+</script>
