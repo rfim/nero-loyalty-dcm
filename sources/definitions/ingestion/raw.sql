@@ -3,16 +3,16 @@
 -- Edit the contract and rerun `python ingestion/build.py` instead.
 -- =============================================================================
 
-DEFINE FILE FORMAT NERO_DB.NERO_LOYALTY.JSON_LINES
+DEFINE FILE FORMAT NERO_DB."00_BRONZE".JSON_LINES
     TYPE = JSON
     STRIP_OUTER_ARRAY = FALSE
     COMMENT = 'One JSON object per line (manifest or record envelope).';
 
-DEFINE STAGE NERO_DB.NERO_LOYALTY.LANDING_STAGE
-    FILE_FORMAT = NERO_DB.NERO_LOYALTY.JSON_LINES
+DEFINE STAGE NERO_DB."00_BRONZE".LANDING_STAGE
+    FILE_FORMAT = NERO_DB."00_BRONZE".JSON_LINES
     COMMENT = 'Credential-free internal stage for manual/CI batch uploads.';
 
-DEFINE TABLE NERO_DB.NERO_LOYALTY.RAW_ENVELOPES (
+DEFINE TABLE NERO_DB."00_BRONZE".RAW_ENVELOPES (
     PAYLOAD          VARCHAR       NOT NULL,
     FILE_NAME        VARCHAR,
     FILE_ROW_NUMBER  NUMBER,

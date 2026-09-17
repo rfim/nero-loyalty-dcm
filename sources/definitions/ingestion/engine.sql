@@ -10,7 +10,7 @@
 
 -- =========================== CONTROL TABLES =================================
 
-DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS (
+DEFINE TABLE NERO_DB."02_CONTROL".CONTROL_DATA_CONTRACTS (
     CONTRACT_ID    VARCHAR(200)   NOT NULL,
     VERSION        NUMBER         NOT NULL,
     CONTRACT_JSON  VARIANT        NOT NULL,
@@ -20,7 +20,7 @@ DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS (
 )
 COMMENT = 'Reviewed data contract documents, keyed by contract_id+version. CONTRACT_HASH is the SHA-256 of the exact contract bytes, pinned by PROCESS_BATCH at deploy time.';
 
-DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT (
+DEFINE TABLE NERO_DB."02_CONTROL".CONTROL_RUN_AUDIT (
     BATCH_ID     VARCHAR(200)   NOT NULL,
     RUN_ID       VARCHAR(200)   NOT NULL,
     STATUS       VARCHAR(30)    NOT NULL,
@@ -29,7 +29,7 @@ DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT (
 )
 COMMENT = 'Audit trail of every PROCESS_BATCH invocation. STATUS one of: PUBLISHED, ALREADY_PUBLISHED, SUPERSEDED, REJECTED, INCOMPLETE, ERROR.';
 
-DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER (
+DEFINE TABLE NERO_DB."02_CONTROL".CONTROL_RELEASE_POINTER (
     POINTER_NAME       VARCHAR(50)   NOT NULL,
     CURRENT_BATCH_ID   VARCHAR(200),
     CURRENT_RELEASE_AT TIMESTAMP_TZ,
@@ -40,7 +40,7 @@ COMMENT = 'Compare-and-set pointer to the currently published batch. Reporting v
 
 -- ============================ WORK TABLE ====================================
 
-DEFINE TABLE NERO_DB.NERO_LOYALTY.WORK_ENVELOPES (
+DEFINE TABLE NERO_DB."02_CONTROL".WORK_ENVELOPES (
     RUN_ID       VARCHAR(200)  NOT NULL,
     BATCH_ID     VARCHAR(200)  NOT NULL,
     DOC          VARIANT       NOT NULL,
@@ -52,12 +52,12 @@ COMMENT = 'Frozen snapshot of one batch''s raw envelopes for a single PROCESS_BA
 -- Suspended by default (DCM default) — resume explicitly once smoke tests
 -- pass. Snowflake auto-suspends after 3 consecutive failures.
 
-DEFINE TASK NERO_DB.NERO_LOYALTY.CONTRACT_GATE_TASK
+DEFINE TASK NERO_DB."02_CONTROL".CONTRACT_GATE_TASK
     WAREHOUSE = 'COMPUTE_WH'
     SCHEDULE = '15 MINUTE'
     COMMENT = 'Calls RUN_PENDING to evaluate/publish outstanding manifested batches. Suspended until explicitly resumed post smoke-test.'
 AS
-    CALL NERO_DB.NERO_LOYALTY.RUN_PENDING();
+    CALL NERO_DB."02_CONTROL".RUN_PENDING();
 
 -- ============================= PROCEDURES ===================================
 -- Validation covers: manifest presence, declared vs actual row counts +
@@ -67,7 +67,7 @@ AS
 -- narrowed vs. the source guide): string-length-by-byte edge cases, offset-
 -- bearing timestamp normalisation beyond ISO parsing, file-content-key dedup.
 
-DEFINE PROCEDURE NERO_DB.NERO_LOYALTY.PROCESS_BATCH(BATCH_ID VARCHAR)
+DEFINE PROCEDURE NERO_DB."02_CONTROL".PROCESS_BATCH(BATCH_ID VARCHAR)
 RETURNS VARIANT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
@@ -81,7 +81,7 @@ import uuid
 from datetime import datetime, date
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 3
+CONTRACT_VERSION = 4
 POINTER_NAME = "LOYALTY_SNAPSHOT"
 
 
@@ -89,12 +89,12 @@ def _validated_table(dataset_name: str) -> str:
     # Naming convention, not a lookup table: ingestion/build.py generates
     # VALIDATED_<DATASET> for every dataset in the contract, so adding a
     # dataset needs no change here — only the contract + a rebuild.
-    return f"NERO_DB.NERO_LOYALTY.VALIDATED_{dataset_name.upper()}"
+    return f"NERO_DB.\"01_SILVER\".VALIDATED_{dataset_name.upper()}"
 
 
 def _audit(session, batch_id, run_id, status, details):
     session.sql(
-        "INSERT INTO NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT "
+        "INSERT INTO NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT "
         "(BATCH_ID, RUN_ID, STATUS, DETAILS) SELECT ?, ?, ?, PARSE_JSON(?)",
         params=[batch_id, run_id, status, json.dumps(details, default=str)],
     ).collect()
@@ -121,7 +121,7 @@ def _parse_scalar(col_type, raw):
 def run(session, batch_id: str) -> dict:
     # Idempotent replay: already-terminal batches are not reprocessed.
     existing = session.sql(
-        "SELECT STATUS FROM NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT "
+        "SELECT STATUS FROM NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT "
         "WHERE BATCH_ID = ? AND STATUS = 'PUBLISHED' LIMIT 1",
         params=[batch_id],
     ).collect()
@@ -132,15 +132,15 @@ def run(session, batch_id: str) -> dict:
 
     # Freeze this batch's envelopes into WORK in one INSERT...SELECT.
     session.sql(
-        "INSERT INTO NERO_DB.NERO_LOYALTY.WORK_ENVELOPES (RUN_ID, BATCH_ID, DOC) "
+        "INSERT INTO NERO_DB.\"02_CONTROL\".WORK_ENVELOPES (RUN_ID, BATCH_ID, DOC) "
         "SELECT DISTINCT ?, ?, PARSE_JSON(PAYLOAD) "
-        "FROM NERO_DB.NERO_LOYALTY.RAW_ENVELOPES "
+        "FROM NERO_DB.\"00_BRONZE\".RAW_ENVELOPES "
         "WHERE PARSE_JSON(PAYLOAD):batch_id::string = ?",
         params=[run_id, batch_id, batch_id],
     ).collect()
 
     rows = session.sql(
-        "SELECT DOC FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?",
+        "SELECT DOC FROM NERO_DB.\"02_CONTROL\".WORK_ENVELOPES WHERE RUN_ID = ?",
         params=[run_id],
     ).collect()
     docs = [json.loads(r["DOC"]) if isinstance(r["DOC"], str) else r["DOC"] for r in rows]
@@ -158,7 +158,7 @@ def run(session, batch_id: str) -> dict:
                        {"reason": "manifest references an unpinned contract_id/version"})
 
     pinned = session.sql(
-        "SELECT CONTRACT_HASH, CONTRACT_JSON FROM NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS "
+        "SELECT CONTRACT_HASH, CONTRACT_JSON FROM NERO_DB.\"02_CONTROL\".CONTROL_DATA_CONTRACTS "
         "WHERE CONTRACT_ID = ? AND VERSION = ?",
         params=[CONTRACT_ID, CONTRACT_VERSION],
     ).collect()
@@ -276,7 +276,7 @@ def run(session, batch_id: str) -> dict:
     # Publication gate: compare-and-set against the release pointer.
     captured_at = manifest.get("captured_at")
     pointer = session.sql(
-        "SELECT CURRENT_RELEASE_AT FROM NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER WHERE POINTER_NAME = ?",
+        "SELECT CURRENT_RELEASE_AT FROM NERO_DB.\"02_CONTROL\".CONTROL_RELEASE_POINTER WHERE POINTER_NAME = ?",
         params=[POINTER_NAME],
     ).collect()
     current_release_at = pointer[0]["CURRENT_RELEASE_AT"] if pointer else None
@@ -297,7 +297,7 @@ def run(session, batch_id: str) -> dict:
             df.write.save_as_table(table, mode="append", column_order="name")
 
     session.sql(
-        "MERGE INTO NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER t "
+        "MERGE INTO NERO_DB.\"02_CONTROL\".CONTROL_RELEASE_POINTER t "
         "USING (SELECT ? AS POINTER_NAME) s ON t.POINTER_NAME = s.POINTER_NAME "
         "WHEN MATCHED THEN UPDATE SET CURRENT_BATCH_ID = ?, CURRENT_RELEASE_AT = ?, UPDATED_AT = CURRENT_TIMESTAMP() "
         "WHEN NOT MATCHED THEN INSERT (POINTER_NAME, CURRENT_BATCH_ID, CURRENT_RELEASE_AT) VALUES (?, ?, ?)",
@@ -305,14 +305,14 @@ def run(session, batch_id: str) -> dict:
     ).collect()
 
     session.sql(
-        "DELETE FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?", params=[run_id]
+        "DELETE FROM NERO_DB.\"02_CONTROL\".WORK_ENVELOPES WHERE RUN_ID = ?", params=[run_id]
     ).collect()
 
     return _audit(session, batch_id, run_id, "PUBLISHED",
                    {ds: len(rows_) for ds, rows_ in validated_rows.items()})
 $$;
 
-DEFINE PROCEDURE NERO_DB.NERO_LOYALTY.RUN_PENDING()
+DEFINE PROCEDURE NERO_DB."02_CONTROL".RUN_PENDING()
 RETURNS VARIANT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
@@ -327,10 +327,10 @@ import json
 def run(session) -> dict:
     pending = session.sql(
         "SELECT DISTINCT PARSE_JSON(PAYLOAD):batch_id::string AS BATCH_ID "
-        "FROM NERO_DB.NERO_LOYALTY.RAW_ENVELOPES "
+        "FROM NERO_DB.\"00_BRONZE\".RAW_ENVELOPES "
         "WHERE PARSE_JSON(PAYLOAD):type::string = 'manifest' "
         "AND PARSE_JSON(PAYLOAD):batch_id::string NOT IN ("
-        "  SELECT BATCH_ID FROM NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT "
+        "  SELECT BATCH_ID FROM NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT "
         "  WHERE STATUS IN ('PUBLISHED', 'REJECTED', 'SUPERSEDED')"
         ") ORDER BY 1 LIMIT 10"
     ).collect()
@@ -340,7 +340,7 @@ def run(session) -> dict:
 
     for row in pending:
         batch_id = row["BATCH_ID"]
-        result = session.call("NERO_DB.NERO_LOYALTY.PROCESS_BATCH", batch_id)
+        result = session.call("NERO_DB.\"02_CONTROL\".PROCESS_BATCH", batch_id)
         if isinstance(result, str):
             result = json.loads(result)
         status = result["status"] if isinstance(result, dict) else None
