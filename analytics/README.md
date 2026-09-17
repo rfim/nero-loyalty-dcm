@@ -27,16 +27,22 @@ Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT` only on
 ## Databases and schemas
 
 ```
-NERO_DB.NERO_LOYALTY          DCM-owned ingestion + validated sources
+NERO_DB.NERO_LOYALTY              DCM-owned ingestion + validated sources
 
-NERO_ANALYTICS.STAGING
-NERO_ANALYTICS.SNAPSHOTS
-NERO_ANALYTICS.INTERMEDIATE
-NERO_ANALYTICS.GOLD
-NERO_ANALYTICS.MART_MARKETING
-NERO_ANALYTICS.MART_OPERATIONS
-NERO_ANALYTICS.AUDIT          dbt-owned, all owned by NERO_DBT_ROLE
+NERO_ANALYTICS."00_STAGING"       one stg_* view per validated source
+NERO_ANALYTICS."01_SNAPSHOTS"     dbt snapshot (customer tier history)
+NERO_ANALYTICS."02_GOLD"          Kimball dimensions + facts
+NERO_ANALYTICS."03_MART_MARKETING"
+NERO_ANALYTICS."04_MART_OPERATIONS"
 ```
+
+Numbered so Snowsight's alphabetical schema listing reads in pipeline
+order. All owned by `NERO_DBT_ROLE`. Quoted identifiers, since Snowflake
+requires quoting a name starting with a digit — `dbt_project.yml` sets
+`quoting.schema: true` project-wide for this reason, and the case must
+match exactly (quoted identifiers are case-sensitive). No `INTERMEDIATE`
+or `AUDIT` schema — both were provisioned in PR1 speculatively and never
+used by any model, so they were dropped rather than carried forward.
 
 ## Local setup
 
@@ -88,5 +94,5 @@ no null dimension surrogate keys, unknown-member rate below an agreed threshold.
 |---|---|---|
 | Staging | view | |
 | Customer history | snapshot | `strategy: check` |
-| Intermediate / dimensions / facts | table | move to incremental `merge` only after reconciliation passes |
+| Dimensions / facts | table | move to incremental `merge` only after reconciliation passes |
 | Marts | table or view | depends on query cost once real data is loaded |

@@ -6,7 +6,6 @@ profile: nero_analytics
 model-paths: ["models"]
 snapshot-paths: ["snapshots"]
 test-paths: ["tests"]
-seed-paths: ["seeds"]
 macro-paths: ["macros"]
 clean-targets: ["target", "dbt_packages"]
 
@@ -14,26 +13,32 @@ vars:
   reporting_timezone: Europe/London
   late_arrival_lookback_days: 3
 
+# Schema names are numbered (00_STAGING, 01_SNAPSHOTS, ...) for readability
+# in Snowsight's alphabetical listing — Snowflake requires identifiers
+# starting with a digit to be quoted, so schema quoting must be on, and the
+# case here must exactly match the real schema name (quoted = case-sensitive).
+quoting:
+  database: false
+  schema: true
+  identifier: false
+
 models:
   nero_analytics:
     staging:
-      +schema: staging
+      +schema: "00_STAGING"
       +materialized: view
-    intermediate:
-      +schema: intermediate
-      +materialized: table
     dimensions:
-      +schema: gold
+      +schema: "02_GOLD"
       +materialized: table
     facts:
-      +schema: gold
+      +schema: "02_GOLD"
       +materialized: table
     marts:
       marketing:
-        +schema: mart_marketing
+        +schema: "03_MART_MARKETING"
       operations:
-        +schema: mart_operations
+        +schema: "04_MART_OPERATIONS"
 
 snapshots:
   nero_analytics:
-    +target_schema: snapshots
+    +target_schema: "01_SNAPSHOTS"

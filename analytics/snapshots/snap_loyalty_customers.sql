@@ -2,7 +2,7 @@
 
 {{
     config(
-        target_schema='snapshots',
+        target_schema='01_SNAPSHOTS',
         unique_key='customer_id',
         strategy='check',
         check_cols=['tier', 'home_store_id'],
