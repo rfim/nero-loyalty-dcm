@@ -1,0 +1,24 @@
+-- =============================================================================
+-- Data Contract Ingestion Pattern — Raw Landing
+-- Credential-free route: internal stage + native table (Example 1 + 3 from
+-- the ingestion guide). Each JSONL line (manifest or record envelope) lands
+-- as one row of raw text; PROCESS_BATCH parses it with PARSE_JSON.
+-- =============================================================================
+
+DEFINE FILE FORMAT NERO_DB.NERO_LOYALTY.JSON_LINES
+    TYPE = JSON
+    STRIP_OUTER_ARRAY = FALSE
+    COMMENT = 'One JSON object per line (manifest or record envelope).';
+
+DEFINE STAGE NERO_DB.NERO_LOYALTY.LANDING_STAGE
+    FILE_FORMAT = NERO_DB.NERO_LOYALTY.JSON_LINES
+    COMMENT = 'Credential-free internal stage for manual/CI batch uploads.';
+
+DEFINE TABLE NERO_DB.NERO_LOYALTY.RAW_ENVELOPES (
+    PAYLOAD          VARCHAR       NOT NULL,
+    FILE_NAME        VARCHAR,
+    FILE_ROW_NUMBER  NUMBER,
+    FILE_CONTENT_KEY VARCHAR,
+    INGESTED_AT      TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Raw landing table. One row per JSON line loaded from LANDING_STAGE via COPY INTO. Batches are identified by FILE_NAME.';
