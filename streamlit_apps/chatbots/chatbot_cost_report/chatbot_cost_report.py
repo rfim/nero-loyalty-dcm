@@ -87,18 +87,25 @@ components.html(html, height=1500, scrolling=True)
 
 
 def build_pdf(d: dict) -> bytes:
-    user_rows = [[u["user_name"], f"{u['request_count']:,}", f"{u['tokens']:,}", f"{u['credits']:.4f}"] for u in d["by_user"]] or [["—", "No agent usage recorded", "", ""]]
-    tool_rows = [[t["source"], f"{t['credits']:.4f}", f"{t['requests']:,}"] for t in d["tool_usage"]] or [["—", "No standalone tool usage recorded", ""]]
+    rate = d["credit_rate"]
+    user_rows = [
+        [u["user_name"], f"{u['request_count']:,}", f"{u['tokens']:,}", f"{u['credits']:.4f}", f"${u['credits'] * rate:.2f}"]
+        for u in d["by_user"]
+    ] or [["—", "No agent usage recorded", "", "", ""]]
+    tool_rows = [
+        [t["source"], f"{t['credits']:.4f}", f"${t['credits'] * rate:.2f}", f"{t['requests']:,}"]
+        for t in d["tool_usage"]
+    ] or [["—", "No standalone tool usage recorded", "", ""]]
     sections = [
         ("Executive Summary", [
             rc.body(f"Total chatbot spend to date: <b>${d['total_usd']:.2f}</b> ({d['total_credits']:.4f} credits at ${d['credit_rate']:.2f}/credit) across <b>{d['total_requests']}</b> agent requests."),
             rc.caption("Source: SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY, keyed by USER_NAME (the chatbot calls the lite-run API without referencing a named agent object)."),
         ]),
         ("1. Agent Usage by Caller", [
-            rc.styled_table(["User", "Requests", "Tokens", "Credits"], user_rows, col_widths=[180, 90, 100, 90]),
+            rc.styled_table(["User", "Requests", "Tokens", "Credits", "USD"], user_rows, col_widths=[150, 80, 90, 80, 80]),
         ]),
         ("2. Underlying Tool Usage", [
-            rc.styled_table(["Tool", "Credits", "Requests"], tool_rows, col_widths=[180, 130, 130]),
+            rc.styled_table(["Tool", "Credits", "USD", "Requests"], tool_rows, col_widths=[150, 100, 100, 110]),
         ]),
     ]
     return rc.build_pdf(
@@ -110,11 +117,21 @@ def build_pdf(d: dict) -> bytes:
 
 
 def build_excel(d: dict) -> bytes:
+    rate = d["credit_rate"]
+    by_user = [
+        {"user_name": u["user_name"], "request_count": u["request_count"], "credits": u["credits"],
+         "usd": u["credits"] * rate, "tokens": u["tokens"]}
+        for u in d["by_user"]
+    ] or [{"user_name": "", "request_count": 0, "credits": 0, "usd": 0, "tokens": 0}]
+    tool_usage = [
+        {"source": t["source"], "credits": t["credits"], "usd": t["credits"] * rate, "requests": t["requests"]}
+        for t in d["tool_usage"]
+    ] or [{"source": "", "credits": 0, "usd": 0, "requests": 0}]
     sheets = {
-        "Agent Usage by User": pd.DataFrame(d["by_user"] or [{"user_name": "", "request_count": 0, "credits": 0, "tokens": 0}])
-            .rename(columns={"user_name": "User", "request_count": "Requests", "credits": "Credits", "tokens": "Tokens"}),
-        "Tool Usage": pd.DataFrame(d["tool_usage"] or [{"source": "", "credits": 0, "requests": 0}])
-            .rename(columns={"source": "Tool", "credits": "Credits", "requests": "Requests"}),
+        "Agent Usage by User": pd.DataFrame(by_user)
+            .rename(columns={"user_name": "User", "request_count": "Requests", "credits": "Credits", "usd": "USD", "tokens": "Tokens"}),
+        "Tool Usage": pd.DataFrame(tool_usage)
+            .rename(columns={"source": "Tool", "credits": "Credits", "usd": "USD", "requests": "Requests"}),
     }
     return rc.write_excel_workbook(
         title="Chatbot Cost Governance Report",

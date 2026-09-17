@@ -175,8 +175,8 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><d
     renderBarChart(document.getElementById('chartUserCredits'), rows, {
       valueFn: r => r.credits, labelFn: r => r.user_name, fmtFn: v => fmtCredits(v), color: 'var(--series-1)'.replace('var(','').replace(')',''),
     });
-    document.getElementById('userTable').innerHTML = `<thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Credits</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td class="name">${r.user_name}</td><td>${fmtInt(r.request_count)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtCredits(r.credits)}</td></tr>`).join('')}</tbody>`;
+    document.getElementById('userTable').innerHTML = `<thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Credits</th><th>USD</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.user_name}</td><td>${fmtInt(r.request_count)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtCredits(r.credits)}</td><td>${fmtUsd(r.credits * DATA.credit_rate)}</td></tr>`).join('')}</tbody>`;
   }
 })();
 
@@ -186,8 +186,8 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><d
   if (rows.length === 0) {
     tt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No standalone Cortex Analyst/Search usage recorded (the agent may bundle their cost into its own request credits).</td></tr></tbody>';
   } else {
-    tt.innerHTML = `<thead><tr><th>Tool</th><th>Credits</th><th>Requests</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
+    tt.innerHTML = `<thead><tr><th>Tool</th><th>Credits</th><th>USD</th><th>Requests</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtUsd(r.credits * DATA.credit_rate)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
   }
   document.getElementById('toolNote').innerHTML = `<b>Why this might be empty even with agent usage above:</b> when Cortex Analyst/Search are called <em>through</em> an agent's lite-run request, Snowflake may attribute the full cost to CORTEX_AGENT_USAGE_HISTORY rather than logging a separate line here. Section 1 is the authoritative total; this section is a supplementary breakdown when Snowflake does log it separately.`;
 })();
