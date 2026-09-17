@@ -1,0 +1,84 @@
+version: 2
+
+models:
+  - name: stg_stores
+    description: One row per store. No aggregation, no surrogate keys.
+    columns:
+      - name: store_id
+        tests: [not_null, unique]
+      - name: store_format
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["High street", "Drive-thru", "Travel"]
+
+  - name: stg_loyalty_customers
+    description: One row per customer, current tier only (history is dbt's, see snapshots).
+    columns:
+      - name: customer_id
+        tests: [not_null, unique]
+      - name: tier
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["Bronze", "Silver", "Gold"]
+      - name: home_store_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_stores')
+                field: store_id
+
+  - name: stg_transactions
+    description: One row per transaction. net_sales_amount is basket_total renamed.
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: store_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_stores')
+                field: store_id
+      - name: customer_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_loyalty_customers')
+                field: customer_id
+      - name: payment_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: [Card, App, Cash]
+
+  - name: stg_loyalty_events
+    description: One row per loyalty event.
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_loyalty_customers')
+                field: customer_id
+      - name: store_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_stores')
+                field: store_id
+      - name: event_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: [signup, earn, redeem, tier_change]
+
+  - name: stg_current_release
+    description: The DCM release pointer — which batch is currently the approved release.
+    columns:
+      - name: pointer_name
+        tests: [not_null]
