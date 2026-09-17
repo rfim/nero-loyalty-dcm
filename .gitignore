@@ -3,3 +3,4 @@ out/
 *.pem
 .snowflake/
 __pycache__/
+streamlit_app/output/

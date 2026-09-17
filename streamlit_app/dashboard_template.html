@@ -1,0 +1,660 @@
+<!doctype html>
+<title>Loyalty & Trading Pulse</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* ---- surfaces & ink (dataviz reference palette) ---- */
+    --surface:        #faf9f7;
+    --surface-card:   #fcfcfb;
+    --ink-primary:    #0b0b0b;
+    --ink-secondary:  #52514e;
+    --ink-muted:      #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+
+    /* ---- brand accent: roast/crema, distinct from chart hues ---- */
+    --brand:          #a8631c;
+    --brand-ink:      #7a4712;
+    --brand-wash:     #f3e6d4;
+
+    /* ---- data: categorical / sequential / status (validated) ---- */
+    --series-blue:    #2a78d6;
+    --series-orange:  #eb6834;
+    --seq-100:        #cde2fb;
+    --seq-250:        #86b6ef;
+    --seq-450:        #2a78d6;
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-serious: #ec835a;
+    --status-crit:    #d03b3b;
+    --divider-good:   #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface:        #0d0d0d;
+      --surface-card:   #1a1a19;
+      --ink-primary:    #ffffff;
+      --ink-secondary:  #c3c2b7;
+      --ink-muted:      #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --brand:          #d9924a;
+      --brand-ink:      #efc292;
+      --brand-wash:     #2a2016;
+      --series-blue:    #3987e5;
+      --series-orange:  #d95926;
+      --seq-100:        #184f95;
+      --seq-250:        #1c5cab;
+      --seq-450:        #3987e5;
+      --status-good:    #0ca30c;
+      --status-warn:    #fab219;
+      --status-serious: #ec835a;
+      --status-crit:    #e66767;
+      --divider-good:   #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:        #0d0d0d;
+    --surface-card:   #1a1a19;
+    --ink-primary:    #ffffff;
+    --ink-secondary:  #c3c2b7;
+    --ink-muted:      #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --brand:          #d9924a;
+    --brand-ink:      #efc292;
+    --brand-wash:     #2a2016;
+    --series-blue:    #3987e5;
+    --series-orange:  #d95926;
+    --seq-100:        #184f95;
+    --seq-250:        #1c5cab;
+    --seq-450:        #3987e5;
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-serious: #ec835a;
+    --status-crit:    #e66767;
+    --divider-good:   #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  img { max-width: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink-primary);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 0 48px;
+  }
+
+  h1, h2, h3 { font-family: "Fraunces", Georgia, serif; text-wrap: balance; margin: 0; }
+
+  /* ---------------- top bar ---------------- */
+  .topbar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    padding: 14px 20px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark { font-family: "Fraunces", serif; font-weight: 600; font-style: italic; font-size: 20px; color: var(--brand-ink); }
+  .brand .sub { color: var(--ink-muted); font-size: 12.5px; letter-spacing: .02em; }
+  .brand .source { color: var(--ink-muted); font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; margin-left: 4px; }
+  .asof { color: var(--ink-secondary); font-size: 12.5px; text-align: right; }
+  .asof b { color: var(--ink-primary); font-variant-numeric: tabular-nums; }
+
+  /* ---------------- hero ---------------- */
+  .hero {
+    padding-block: 28px 8px;
+  }
+  .hero-title { font-size: 30px; font-weight: 600; }
+  .hero-desc { color: var(--ink-secondary); max-width: 640px; margin-top: 8px; font-size: 14.5px; }
+  .hero-meta { color: var(--ink-muted); font-size: 12.5px; margin-top: 10px; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--gridline);
+    border: 1px solid var(--gridline);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 22px;
+  }
+  .kpi {
+    background: var(--surface-card);
+    padding: 16px 16px 14px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--ink-muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  .kpi .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  .kpi .note { color: var(--ink-secondary); font-size: 11.5px; margin-top: 3px; }
+
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ---------------- sections ---------------- */
+  section { padding-block: 40px 4px; border-top: 1px solid var(--gridline); }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .eyebrow { color: var(--brand-ink); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .section-title { font-size: 22px; margin-top: 4px; }
+  .section-sub { color: var(--ink-secondary); font-size: 13.5px; max-width: 600px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 28px; align-items: start; }
+  .grid-2-even { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 800px) { .grid-2, .grid-2-even { grid-template-columns: 1fr; } }
+
+  .panel-title { font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
+  .panel-note { color: var(--ink-muted); font-size: 12px; margin-bottom: 14px; }
+
+  /* ---------------- bar chart ---------------- */
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 12px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 12px; font-weight: 600; fill: var(--ink-primary); font-variant-numeric: tabular-nums; }
+  .bar-fill { rx: 3; }
+  .bar-track { fill: var(--gridline); }
+  .axis-line { stroke: var(--baseline); stroke-width: 1; }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered { filter: brightness(1.08); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--surface-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 11px; font-size: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    color: var(--ink-primary); max-width: 220px;
+    transform: translate(-50%, -100%);
+    opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 600; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink-primary); font-variant-numeric: tabular-nums; }
+
+  .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--ink-secondary); margin-bottom: 12px; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  /* ---------------- callouts ---------------- */
+  .callouts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin-top: 6px; }
+  @media (max-width: 800px) { .callouts { grid-template-columns: 1fr; } }
+  .callout { border-left: 3px solid var(--baseline); padding: 4px 0 4px 14px; }
+  .callout.warn { border-color: var(--status-warn); }
+  .callout.serious { border-color: var(--status-serious); }
+  .callout.good { border-color: var(--status-good); }
+  .callout.info { border-color: var(--series-blue); }
+  .callout .c-head { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; }
+  .callout .c-icon { font-size: 13px; line-height: 1; }
+  .callout p { margin: 4px 0 0; color: var(--ink-secondary); font-size: 12.8px; }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12.8px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 11px; letter-spacing: .03em; text-transform: uppercase; padding: 6px 10px; border-bottom: 1px solid var(--gridline); }
+  table.datatable td { padding: 7px 10px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; }
+  table.datatable tr:hover td { background: color-mix(in srgb, var(--brand-wash) 55%, transparent); }
+  .tbl-wrap { overflow-x: auto; }
+  .delta-up { color: var(--divider-good); font-weight: 600; }
+  .delta-down { color: var(--status-crit); font-weight: 600; }
+
+  footer { color: var(--ink-muted); font-size: 12px; padding-top: 30px; border-top: 1px solid var(--gridline); margin-top: 40px; }
+  footer p { max-width: 720px; }
+</style>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">Caffè Nero</span>
+      <span class="sub">Loyalty &amp; Trading Pulse</span>
+      <span class="source">live · NERO_DB."01_SILVER"</span>
+    </div>
+    <div class="asof" id="asOf"></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-title">Loyalty &amp; trading pulse</div>
+    <p class="hero-desc">A first look at the store network's loyalty engagement and how it relates to in-store spend, queried live from the four validated source extracts — cleaned and cross-checked before anything here was charted.</p>
+    <div class="hero-meta" id="heroMeta"></div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- ============ SECTION 1: STORE & REGION ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Store &amp; region performance</div>
+        <h2 class="section-title">Who's engaging customers well — and who isn't</h2>
+      </div>
+      <p class="section-sub">Redemption rate = redeem events ÷ earn events. A low rate means points are being earned but not coming back as visits.</p>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="panel-title">Redemption rate by store</div>
+        <div class="panel-note">Sorted best to worst · full loyalty history</div>
+        <svg id="chartStoreRR" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">Change: last 28 days vs. the 28 before</div>
+        <div class="panel-note">Small stores move a lot on a handful of events — treat single-digit swings as noisy, not a trend</div>
+        <svg id="chartStoreDelta" class="barchart"></svg>
+      </div>
+    </div>
+
+    <div class="grid-2-even" style="margin-top:34px;">
+      <div>
+        <div class="panel-title">Signups by region</div>
+        <div class="panel-note">Full loyalty history</div>
+        <svg id="chartRegionSignups" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">Redemption rate by region</div>
+        <div class="panel-note">Scotland and the South West lead; Yorkshire and the South East trail</div>
+        <svg id="chartRegionRR" class="barchart"></svg>
+      </div>
+    </div>
+
+    <div style="margin-top:34px;">
+      <div class="panel-title">All stores</div>
+      <div class="tbl-wrap">
+        <table class="datatable" id="storeTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 2: LOYALTY vs SALES ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Loyalty &amp; sales</div>
+        <h2 class="section-title">Does a loyalty tier actually change buying behaviour?</h2>
+      </div>
+      <p class="section-sub">Every transaction with a scanned loyalty account, split by that customer's current tier, compared against till-only (walk-in) baskets.</p>
+    </div>
+
+    <div class="grid-2-even">
+      <div>
+        <div class="panel-title">Average basket by segment</div>
+        <div class="panel-note">Basket value (£), current tier at time of query</div>
+        <svg id="chartBasket" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">Visits per customer, per 30 days</div>
+        <div class="panel-note">Walk-ins excluded — there's no account to count repeat visits against</div>
+        <svg id="chartVisits" class="barchart"></svg>
+      </div>
+    </div>
+
+    <div class="callouts" style="margin-top:28px;" id="tierCallouts"></div>
+  </section>
+
+  <!-- ============ SECTION 3: ATTENTION ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Worth a closer look</div>
+        <h2 class="section-title">What the data itself is telling us</h2>
+      </div>
+      <p class="section-sub">Findings from cleaning and cross-checking the four extracts before anything above was charted.</p>
+    </div>
+
+    <div class="callouts">
+      <div class="callout warn">
+        <div class="c-head"><span class="c-icon">⚑</span> The two feeds cover different windows</div>
+        <p id="windowNote"></p>
+      </div>
+      <div class="callout info">
+        <div class="c-head"><span class="c-icon">◆</span> Walk-ins are the majority of transactions</div>
+        <p id="walkinNote"></p>
+      </div>
+      <div class="callout info">
+        <div class="c-head"><span class="c-icon">◆</span> Only a handful of rewards exist, with no name or catalogue</div>
+        <p id="rewardNote"></p>
+      </div>
+      <div class="callout good">
+        <div class="c-head"><span class="c-icon">✓</span> Referential integrity is otherwise clean</div>
+        <p>No duplicate transaction, event or customer IDs; every foreign key (store, customer) resolves; every redeem event has a reward_id and no other event type does; no negative baskets or item counts in the validated silver tables.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Queried live from <code>NERO_DB."01_SILVER"</code> — the same validated tables published by the contract-validation pipeline from stores.csv, loyalty_customers.csv, transactions.csv and loyalty_events.csv. Tier is each customer's <em>current</em> tier as recorded today, not their historical tier at the time of each visit — the source data has no tier-change history (old/new tier) to reconstruct that precisely, so treat the loyalty/sales comparison above as directional, not exact.</p>
+  </footer>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) {
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  positionTip(evt);
+}
+function positionTip(evt) {
+  const pad = 14;
+  let x = evt.clientX, y = evt.clientY - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTip() { tooltip.classList.remove('show'); }
+
+const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtGBP = (v) => v == null ? '—' : '£' + v.toFixed(2);
+const fmtNum1 = (v) => v == null ? '—' : v.toFixed(1);
+const fmtDate = (s) => s == null ? '—' : new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+/* ---------- generic horizontal bar chart ---------- */
+function renderBarChart(svgEl, rows, {
+  valueFn, labelFn, fmtFn, color, maxOverride, tipRows, height,
+}) {
+  const n = rows.length;
+  const rowH = height || 30;
+  const labelW = 118;
+  const valueW = 56;
+  const chartW = 420;
+  const totalW = labelW + chartW + valueW;
+  const totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.style.height = totalH + 'px';
+
+  const max = maxOverride || Math.max(...rows.map(valueFn)) * 1.08;
+  svgEl.innerHTML = '';
+
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4;
+    const v = valueFn(row);
+    const w = Math.max((v / max) * chartW, 2);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8);
+    label.setAttribute('y', y + rowH / 2 - 4);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label');
+    label.textContent = labelFn(row);
+    svgEl.appendChild(label);
+
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW);
+    track.setAttribute('y', y);
+    track.setAttribute('width', chartW);
+    track.setAttribute('height', rowH - 10);
+    track.setAttribute('rx', 3);
+    track.setAttribute('class', 'bar-track');
+    svgEl.appendChild(track);
+
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW);
+    fill.setAttribute('y', y);
+    fill.setAttribute('width', w);
+    fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('rx', 3);
+    fill.setAttribute('fill', typeof color === 'function' ? color(row) : color);
+    fill.setAttribute('class', 'bar-fill');
+    svgEl.appendChild(fill);
+
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10);
+    vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label');
+    vLabel.textContent = fmtFn(v);
+    svgEl.appendChild(vLabel);
+
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0);
+    hit.setAttribute('y', y - 2);
+    hit.setAttribute('width', totalW);
+    hit.setAttribute('height', rowH);
+    hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => {
+      fill.classList.add('hovered');
+      showTip(e, tipRows(row));
+    });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+/* ---------- diverging bar chart (centered at 0) ---------- */
+function renderDivergingChart(svgEl, rows, { valueFn, labelFn, tipRows, height }) {
+  const n = rows.length;
+  const rowH = height || 30;
+  const labelW = 118;
+  const chartW = 320;
+  const valueW = 60;
+  const totalW = labelW + chartW + valueW;
+  const totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.style.height = totalH + 'px';
+  svgEl.innerHTML = '';
+
+  const maxAbs = Math.max(...rows.map(r => Math.abs(valueFn(r)))) * 1.15 || 0.01;
+  const mid = labelW + chartW / 2;
+  const scale = (chartW / 2) / maxAbs;
+  const goodColor = getComputedStyle(document.documentElement).getPropertyValue('--divider-good').trim();
+  const critColor = getComputedStyle(document.documentElement).getPropertyValue('--status-crit').trim();
+
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4;
+    const v = valueFn(row);
+    const w = Math.abs(v) * scale;
+    const barH = rowH - 10;
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8);
+    label.setAttribute('y', y + barH / 2 + 4);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label');
+    label.textContent = labelFn(row);
+    svgEl.appendChild(label);
+
+    const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    axis.setAttribute('x1', mid); axis.setAttribute('x2', mid);
+    axis.setAttribute('y1', 0); axis.setAttribute('y2', totalH);
+    axis.setAttribute('class', 'axis-line');
+    svgEl.appendChild(axis);
+
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', v >= 0 ? mid : mid - w);
+    fill.setAttribute('y', y);
+    fill.setAttribute('width', Math.max(w, 1.5));
+    fill.setAttribute('height', barH);
+    fill.setAttribute('rx', 3);
+    fill.setAttribute('fill', v >= 0 ? goodColor : critColor);
+    fill.setAttribute('class', 'bar-fill');
+    svgEl.appendChild(fill);
+
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 8);
+    vLabel.setAttribute('y', y + barH / 2 + 4);
+    vLabel.setAttribute('class', 'bar-value-label');
+    vLabel.setAttribute('fill', v >= 0 ? goodColor : critColor);
+    vLabel.textContent = (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + 'pp';
+    svgEl.appendChild(vLabel);
+
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2);
+    hit.setAttribute('width', totalW); hit.setAttribute('height', rowH);
+    hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, tipRows(row)); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+/* ================= HEADER TEXT ================= */
+document.getElementById('asOf').innerHTML =
+  `Reporting window <b>${fmtDate(DATA.summary.txn_date_min)} – ${fmtDate(DATA.summary.txn_date_max)}</b> · loyalty history from <b>${fmtDate(DATA.summary.event_date_min)}</b>`;
+document.getElementById('heroMeta').textContent =
+  `${fmtInt(DATA.summary.n_stores)} stores · ${fmtInt(DATA.summary.n_customers)} enrolled customers · ${fmtInt(DATA.summary.n_transactions)} transactions · ${fmtInt(DATA.summary.n_events)} loyalty events`;
+
+/* ================= KPI ROW ================= */
+const bestStore = [...DATA.stores].sort((a,b) => b.rr - a.rr)[0];
+const kpis = [
+  { label: 'Overall redemption rate', value: fmtPct(DATA.summary.overall_rr), note: `${fmtInt(DATA.summary.total_redeems)} of ${fmtInt(DATA.summary.total_earns)} earns redeemed` },
+  { label: 'Total signups', value: fmtInt(DATA.summary.total_signups), note: 'across the full loyalty history' },
+  { label: 'Loyalty-identified sales', value: fmtPct(DATA.summary.loyalty_txn_share), note: `of ${fmtInt(DATA.summary.n_transactions)} transactions` },
+  { label: 'Average basket', value: fmtGBP(DATA.summary.avg_basket_all), note: 'all transactions' },
+  { label: 'Best store: redemption', value: fmtPct(bestStore.rr), note: bestStore.name },
+  { label: 'Distinct rewards', value: fmtInt(DATA.summary.n_distinct_rewards), note: 'no reward catalogue supplied' },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `
+  <div class="kpi">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="note">${k.note}</div>
+  </div>
+`).join('');
+
+/* ================= NARRATIVE CALLOUTS (computed) ================= */
+const seg = {};
+DATA.segments.forEach(s => seg[s.segment] = s);
+const tierBaskets = ['Bronze','Silver','Gold'].filter(t => seg[t]).map(t => seg[t].avg_basket);
+const walkinBasket = seg['Walk-in'] ? seg['Walk-in'].avg_basket : null;
+const allBaskets = [...tierBaskets, ...(walkinBasket != null ? [walkinBasket] : [])];
+const basketSpread = allBaskets.length ? ((Math.max(...allBaskets) - Math.min(...allBaskets)) / Math.min(...allBaskets) * 100).toFixed(0) : '—';
+const visitVals = ['Bronze','Silver','Gold'].filter(t => seg[t] && seg[t].visits_per_30d != null).map(t => `${t} ${fmtNum1(seg[t].visits_per_30d)}`);
+document.getElementById('tierCallouts').innerHTML = `
+  <div class="callout info">
+    <div class="c-head"><span class="c-icon">◆</span> Basket size is close to flat across segments</div>
+    <p>${fmtGBP(Math.min(...allBaskets))}–${fmtGBP(Math.max(...allBaskets))} across Walk-in, Bronze, Silver and Gold — roughly a ${basketSpread}% spread. Holding a loyalty tier shows little relationship to spend per visit in this data.</p>
+  </div>
+  <div class="callout info">
+    <div class="c-head"><span class="c-icon">◆</span> Visit frequency doesn't track tier in a straight line</div>
+    <p>Visits per 30 days by tier: ${visitVals.join(' · ')}. Worth a second look with real customer-level history rather than a current-tier snapshot.</p>
+  </div>`;
+
+const loyaltyShareTxns = Math.round(DATA.summary.n_transactions * DATA.summary.loyalty_txn_share);
+const walkinTxns = DATA.summary.n_transactions - loyaltyShareTxns;
+document.getElementById('windowNote').textContent =
+  `Transactions span ${fmtDate(DATA.summary.txn_date_min)}–${fmtDate(DATA.summary.txn_date_max)}. Loyalty events go back to ${fmtDate(DATA.summary.event_date_min)} — much earlier. Any "loyalty vs. sales" comparison only ever looks at the transaction window against a longer engagement history.`;
+document.getElementById('walkinNote').innerHTML =
+  `${fmtInt(walkinTxns)} of ${fmtInt(DATA.summary.n_transactions)} transactions (${(100 - DATA.summary.loyalty_txn_share*100).toFixed(1)}%) carry no <code>customer_id</code> — a valid, expected non-loyalty basket, not missing data.`;
+document.getElementById('rewardNote').innerHTML =
+  `Every redeem event carries a <code>reward_id</code> (${DATA.summary.n_distinct_rewards} distinct values) and nothing else. Redemption is reported by ID only — no reward names or point values were invented to fill the gap.`;
+
+/* ================= STORE RR CHART ================= */
+const storesSorted = [...DATA.stores].sort((a, b) => b.rr - a.rr);
+(function(){
+  const blue = getComputedStyle(document.documentElement).getPropertyValue('--series-blue').trim();
+  const good = getComputedStyle(document.documentElement).getPropertyValue('--divider-good').trim();
+  const bestRR = Math.max(...storesSorted.map(s=>s.rr));
+  renderBarChart(document.getElementById('chartStoreRR'), storesSorted, {
+    valueFn: r => r.rr, labelFn: r => r.name, fmtFn: v => (v*100).toFixed(1)+'%',
+    color: r => r.rr === bestRR ? good : blue,
+    tipRows: r => `<div class="t-title">${r.name}</div>
+      <div class="t-row"><span>Region</span><b>${r.region}</b></div>
+      <div class="t-row"><span>Redemption rate</span><b>${fmtPct(r.rr)}</b></div>
+      <div class="t-row"><span>Signups</span><b>${fmtInt(r.signups)}</b></div>
+      <div class="t-row"><span>Earns / Redeems</span><b>${fmtInt(r.earns)} / ${fmtInt(r.redeems)}</b></div>`,
+  });
+
+  /* ================= STORE DELTA CHART ================= */
+  const storesByDelta = [...DATA.stores].sort((a,b) => b.rr_delta - a.rr_delta);
+  renderDivergingChart(document.getElementById('chartStoreDelta'), storesByDelta, {
+    valueFn: r => r.rr_delta,
+    labelFn: r => r.name,
+    tipRows: r => `<div class="t-title">${r.name}</div>
+      <div class="t-row"><span>Last 28 days</span><b>${fmtPct(r.rr_recent)}</b></div>
+      <div class="t-row"><span>Previous 28 days</span><b>${fmtPct(r.rr_prior)}</b></div>
+      <div class="t-row"><span>Change</span><b>${r.rr_delta>=0?'+':''}${(r.rr_delta*100).toFixed(1)}pp</b></div>`,
+  });
+
+  /* ================= REGION CHARTS ================= */
+  const regionsBySignup = [...DATA.regions].sort((a,b)=>b.signups-a.signups);
+  renderBarChart(document.getElementById('chartRegionSignups'), regionsBySignup, {
+    valueFn: r => r.signups, labelFn: r => r.region, fmtFn: v => fmtInt(v),
+    color: blue, height: 32,
+    tipRows: r => `<div class="t-title">${r.region}</div><div class="t-row"><span>Signups</span><b>${fmtInt(r.signups)}</b></div>`,
+  });
+  const regionsByRR = [...DATA.regions].sort((a,b)=>b.rr-a.rr);
+  const orange = getComputedStyle(document.documentElement).getPropertyValue('--series-orange').trim();
+  renderBarChart(document.getElementById('chartRegionRR'), regionsByRR, {
+    valueFn: r => r.rr, labelFn: r => r.region, fmtFn: v => (v*100).toFixed(1)+'%',
+    color: orange, height: 32,
+    tipRows: r => `<div class="t-title">${r.region}</div><div class="t-row"><span>Redemption rate</span><b>${fmtPct(r.rr)}</b></div>`,
+  });
+
+  /* ================= SEGMENT CHARTS ================= */
+  const tierOrder = { 'Gold': 0, 'Silver': 1, 'Bronze': 2, 'Walk-in': 3 };
+  const segByOrder = [...DATA.segments].sort((a,b) => tierOrder[a.segment]-tierOrder[b.segment]);
+  const seq450 = getComputedStyle(document.documentElement).getPropertyValue('--seq-450').trim();
+  const seq250 = getComputedStyle(document.documentElement).getPropertyValue('--seq-250').trim();
+  const seq100 = getComputedStyle(document.documentElement).getPropertyValue('--seq-100').trim();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--baseline').trim();
+  const tierColor = { Gold: seq450, Silver: seq250, Bronze: seq100, 'Walk-in': muted };
+
+  renderBarChart(document.getElementById('chartBasket'), segByOrder, {
+    valueFn: r => r.avg_basket, labelFn: r => r.segment, fmtFn: v => '£'+v.toFixed(2),
+    color: r => tierColor[r.segment], height: 32, maxOverride: Math.max(...segByOrder.map(r=>r.avg_basket)) * 1.15,
+    tipRows: r => `<div class="t-title">${r.segment}</div>
+      <div class="t-row"><span>Avg basket</span><b>${fmtGBP(r.avg_basket)}</b></div>
+      <div class="t-row"><span>Transactions</span><b>${fmtInt(r.transactions)}</b></div>`,
+  });
+
+  const segVisits = segByOrder.filter(r => r.segment !== 'Walk-in' && r.visits_per_30d != null);
+  renderBarChart(document.getElementById('chartVisits'), segVisits, {
+    valueFn: r => r.visits_per_30d, labelFn: r => r.segment, fmtFn: v => v.toFixed(1),
+    color: r => tierColor[r.segment], height: 34,
+    tipRows: r => `<div class="t-title">${r.segment}</div>
+      <div class="t-row"><span>Visits / 30 days</span><b>${fmtNum1(r.visits_per_30d)}</b></div>
+      <div class="t-row"><span>Customers</span><b>${fmtInt(r.distinct_customers)}</b></div>`,
+  });
+
+  /* ================= STORE TABLE ================= */
+  const tbl = document.getElementById('storeTable');
+  const rowsHtml = [...DATA.stores].sort((a,b)=>b.rr-a.rr).map(r => {
+    const deltaClass = r.rr_delta >= 0 ? 'delta-up' : 'delta-down';
+    const deltaTxt = (r.rr_delta >= 0 ? '+' : '') + (r.rr_delta*100).toFixed(1) + 'pp';
+    return `<tr>
+      <td class="name">${r.name}</td>
+      <td>${r.region}</td>
+      <td>${r.format}</td>
+      <td>${fmtInt(r.signups)}</td>
+      <td>${fmtPct(r.rr)}</td>
+      <td class="${deltaClass}">${deltaTxt}</td>
+    </tr>`;
+  }).join('');
+  tbl.innerHTML = `<thead><tr>
+      <th>Store</th><th>Region</th><th>Format</th><th>Signups</th><th>Redemption rate</th><th>28d change</th>
+    </tr></thead><tbody>${rowsHtml}</tbody>`;
+})();
+
+document.addEventListener('mousemove', (e) => {
+  if (tooltip.classList.contains('show')) positionTip(e);
+});
+</script>

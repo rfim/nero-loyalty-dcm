@@ -1,0 +1,16 @@
+definition_version: "2"
+entities:
+  nero_loyalty_pulse:
+    type: streamlit
+    identifier:
+      name: LOYALTY_TRADING_PULSE
+      schema: NERO_LOYALTY
+      database: NERO_DB
+    stage: streamlit_stage
+    query_warehouse: COMPUTE_WH
+    main_file: loyalty_trading_pulse.py
+    artifacts:
+      - loyalty_trading_pulse.py
+      - dashboard_template.html
+      - environment.yml
+    title: "Loyalty & Trading Pulse"
