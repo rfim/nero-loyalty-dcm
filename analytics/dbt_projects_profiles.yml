@@ -1,0 +1,27 @@
+# Profile for the dbt Projects on Snowflake object (Snowsight), as opposed to
+# profiles.example.yml which is for running dbt-core externally (locally or
+# in CI). No credentials here -- a native Snowflake dbt project runs inside
+# Snowflake under whichever role invokes it, so this only needs to say which
+# role/warehouse/database/schema to use, not how to authenticate. Safe to
+# commit for that reason. When both files are present, Snowflake prefers this
+# one over profiles.yml for deploy/compile/run.
+#
+# Both targets use NERO_DBT_ROLE (same least-privilege role as local/CI dbt
+# runs -- see ../account_setup/service_users.sql) so the object's execution
+# grants match the object's ownership.
+nero_analytics:
+  target: prod
+  outputs:
+    dev:
+      type: snowflake
+      database: NERO_ANALYTICS
+      role: NERO_DBT_ROLE
+      warehouse: NERO_DBT_WH
+      schema: dbt_dev
+
+    prod:
+      type: snowflake
+      database: NERO_ANALYTICS
+      role: NERO_DBT_ROLE
+      warehouse: NERO_DBT_WH
+      schema: gold

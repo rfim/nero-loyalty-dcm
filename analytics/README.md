@@ -65,6 +65,42 @@ dbt deps
 dbt debug
 ```
 
+## dbt Projects on Snowflake (Snowsight)
+
+This project is also registered as a native `DBT PROJECT` object
+(`NERO_ANALYTICS.DBT_PROJECT.NERO_ANALYTICS`, owned by `NERO_DBT_ROLE`), so
+it shows up under Projects in Snowsight and can be run from there in
+addition to the CLI/CI paths above. Two things make this a separate concern
+from the local/CI setup:
+
+- **`dbt_projects_profiles.yml`** replaces `profiles.yml` for this object.
+  A native Snowflake dbt project runs *inside* Snowflake under whichever
+  role invokes it, so this file only needs `database`/`role`/`warehouse`/
+  `schema` per target -- no credentials -- and is safe to commit. When both
+  files are present Snowflake prefers this one.
+- **Generic test syntax**: the engine behind `DBT PROJECT` objects currently
+  runs dbt-core 1.9.4, which predates the `arguments:` nesting convention
+  for generic test config (added in later dbt-core). All test blocks in
+  this project use the flat, pre-`arguments:` style for that reason --
+  locally this only produces a `MissingArgumentsPropertyInGenericTestDeprecation`
+  warning (still fully supported), but the nested style fails to compile on
+  Snowflake with `macro ... takes no keyword argument 'arguments'`.
+
+Redeploy after a model/test change:
+
+```bash
+snow dbt deploy nero_analytics --source . --profiles-dir . \
+  -c nero_dbt_test --database NERO_ANALYTICS --schema DBT_PROJECT
+```
+
+`snow dbt deploy`'s stage-upload step doesn't reliably respect
+`.dbtignore` for `dbt_packages/`/`target/` (a known CLI limitation) --
+if `--source .` fails with `Cannot join path to a file`, deploy from a
+clean copy that excludes `target/`/`logs/` but keeps `dbt_packages/`
+(Snowflake's dbt engine doesn't install packages from the Hub itself
+unless an external access integration is attached, so the
+already-resolved `dbt_packages/` needs to travel with the upload).
+
 ## Delivery plan
 
 Built as a sequence of small PRs — see the project's PR history for the
