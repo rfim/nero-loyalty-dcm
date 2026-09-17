@@ -1,0 +1,17 @@
+definition_version: "2"
+entities:
+  nero_governance_assistant:
+    type: streamlit
+    identifier:
+      name: NERO_GOVERNANCE_ASSISTANT
+      schema: APPS
+      database: NERO_GOVERNANCE
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: nero_governance_assistant.py
+    artifacts:
+      - nero_governance_assistant.py
+      - chat_export.py
+      - chat_store.py
+      - requirements.txt
+    title: "Nero Governance Assistant"
