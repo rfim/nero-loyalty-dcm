@@ -11,12 +11,10 @@ models:
     description: "Grain: one row per store + calendar date with any activity."
     tests:
       - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns: [performance_date, store_id]
+          combination_of_columns: [performance_date, store_id]
 
   - name: mart_reward_redemption_daily
     description: "Grain: date, store, reward_id."
     tests:
       - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns: [redemption_date, store_id, reward_id]
+          combination_of_columns: [redemption_date, store_id, reward_id]
