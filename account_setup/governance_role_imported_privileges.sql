@@ -1,0 +1,35 @@
+-- =============================================================================
+-- Grant NERO_GOVERNANCE_ROLE IMPORTED PRIVILEGES on the SNOWFLAKE database,
+-- so its owned apps can query SNOWFLAKE.ACCOUNT_USAGE / .ORGANIZATION_USAGE
+-- directly.
+--
+-- Three of NERO_GOVERNANCE_ROLE's apps query these schemas directly rather
+-- than through a wrapper view:
+--   - COST_GOVERNANCE_REPORT: SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY,
+--     SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY,
+--     SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY
+--   - CHATBOT_COST_GOVERNANCE_REPORT: SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY
+--   - CHATBOT_SECURITY_GOVERNANCE_REPORT: SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY
+--
+-- These apps worked before the streamlit_apps ownership fix only because
+-- they ran under ACCOUNTADMIN (which gets this access implicitly) --
+-- ACCOUNTADMIN's implicit access silently covered for a missing grant on
+-- the role these apps are actually supposed to run as. Once ownership
+-- correctly moved to NERO_GOVERNANCE_ROLE, that gap surfaced as "Schema
+-- 'SNOWFLAKE.ORGANIZATION_USAGE' does not exist or not authorized" at
+-- runtime.
+--
+-- SECURITY_GOVERNANCE_REPORT is NOT affected -- it only reads through
+-- NERO_GOVERNANCE.SECURITY.* wrapper views (ROLE_GRANTS_INVENTORY,
+-- LOGIN_ACTIVITY_DAILY, etc.), which already carry their own access to
+-- the underlying ACCOUNT_USAGE views via their owner. NERO_BI_ROLE's apps
+-- (LOYALTY_TRADING_PULSE, NERO_ASSISTANT) don't touch ACCOUNT_USAGE /
+-- ORGANIZATION_USAGE at all, so NERO_BI_ROLE doesn't need this grant.
+--
+-- Idempotent: safe to re-run. Apply with:
+--   snow sql -f account_setup/governance_role_imported_privileges.sql
+-- =============================================================================
+
+USE ROLE ACCOUNTADMIN;
+
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE NERO_GOVERNANCE_ROLE;
