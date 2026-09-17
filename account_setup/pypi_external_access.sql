@@ -26,6 +26,18 @@ CREATE EXTERNAL ACCESS INTEGRATION IF NOT EXISTS NERO_PYPI_ACCESS_INTEGRATION
   ENABLED = TRUE
   COMMENT = 'Lets governance_app Streamlit apps pip-install reportlab/xlsxwriter at deploy time. Scoped to PyPI hosts only via PYPI_NETWORK_RULE.';
 
+-- CREATE ... IF NOT EXISTS above is a no-op once the integration already
+-- exists, so it silently does NOT pick up a changed ALLOWED_NETWORK_RULES
+-- on re-run -- bit us for real: when NERO_GOVERNANCE.APPS was renamed to
+-- CORTEX_TOOLS, this file's CREATE statement was updated to the new path,
+-- but re-running it left the live integration still pointing at the
+-- now-nonexistent NERO_GOVERNANCE.APPS.PYPI_NETWORK_RULE, breaking every
+-- app that uses it (SQL compilation error: Schema 'NERO_GOVERNANCE.APPS'
+-- does not exist). This explicit ALTER is what actually keeps the live
+-- object in sync on re-apply, regardless of whether CREATE ran or not.
+ALTER EXTERNAL ACCESS INTEGRATION NERO_PYPI_ACCESS_INTEGRATION
+  SET ALLOWED_NETWORK_RULES = (NERO_GOVERNANCE.CORTEX_TOOLS.PYPI_NETWORK_RULE);
+
 ALTER STREAMLIT NERO_GOVERNANCE.APPS_DASHBOARDS.COST_GOVERNANCE_REPORT
   SET EXTERNAL_ACCESS_INTEGRATIONS = (NERO_PYPI_ACCESS_INTEGRATION);
 
