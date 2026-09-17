@@ -1,0 +1,58 @@
+name: DCM Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli
+
+      - name: Configure Snowflake connection
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.snowflake/keys
+          echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/keys/rsa_key.p8
+          chmod 600 ~/.snowflake/keys/rsa_key.p8
+          snow connection add \
+            --connection-name ci \
+            --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            --user "${{ secrets.SNOWFLAKE_USER }}" \
+            --role "${{ secrets.SNOWFLAKE_ROLE }}" \
+            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            --database "${{ secrets.SNOWFLAKE_DATABASE }}" \
+            --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            --authenticator SNOWFLAKE_JWT \
+            --private-key ~/.snowflake/keys/rsa_key.p8 \
+            --default \
+            --no-interactive
+
+      - name: DCM plan
+        run: snow dcm plan 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci
+
+      - name: DCM deploy
+        run: snow dcm deploy 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci --alias "ci-${{ github.sha }}"
+
+      - name: Deploy Streamlit app
+        run: |
+          snow stage create NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE -c ci || true
+          snow stage copy streamlit_app/streamlit_app.py @NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE \
+            --overwrite -c ci
+          snow sql -c ci -q "
+            CREATE OR REPLACE STREAMLIT NERO_DB.NERO_LOYALTY.NERO_LOYALTY_DASHBOARD
+              ROOT_LOCATION = '@NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE'
+              MAIN_FILE = 'streamlit_app.py'
+              QUERY_WAREHOUSE = 'COMPUTE_WH'
+              COMMENT = 'Loyalty/sales overview dashboard, deployed by CI.'
+          "
