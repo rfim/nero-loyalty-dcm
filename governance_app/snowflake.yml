@@ -13,7 +13,7 @@ entities:
       - cost_report.py
       - cost_dashboard_template.html
       - report_common.py
-      - environment.yml
+      - requirements.txt
     title: "Cost Governance Report"
 
   nero_security_report:
@@ -29,5 +29,5 @@ entities:
       - security_report.py
       - security_dashboard_template.html
       - report_common.py
-      - environment.yml
+      - requirements.txt
     title: "Security & Horizon Governance Report"

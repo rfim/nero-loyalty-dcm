@@ -1,9 +1,0 @@
-name: app_environment
-channels:
-  - snowflake
-dependencies:
-  - streamlit
-  - snowflake-snowpark-python
-  - pandas
-  - reportlab
-  - xlsxwriter
