@@ -1,0 +1,16 @@
+definition_version: "2"
+entities:
+  nero_cost_security_watch:
+    type: streamlit
+    identifier:
+      name: COST_SECURITY_WATCH
+      schema: APPS
+      database: NERO_GOVERNANCE
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: cost_security_watch.py
+    artifacts:
+      - cost_security_watch.py
+      - dashboard_template.html
+      - environment.yml
+    title: "Cost & Security Watch"

@@ -1,0 +1,540 @@
+<!doctype html>
+<title>Cost & Security Watch</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    --surface:        #faf9f7;
+    --surface-card:   #fcfcfb;
+    --ink-primary:    #0b0b0b;
+    --ink-secondary:  #52514e;
+    --ink-muted:      #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+
+    /* brand accent: slate/steel, distinct from the loyalty app's amber */
+    --brand:          #3d5a73;
+    --brand-ink:      #294256;
+    --brand-wash:     #e3e9ee;
+
+    --series-blue:    #2a78d6;
+    --series-orange:  #eb6834;
+    --series-aqua:    #1baf7a;
+    --series-yellow:  #eda100;
+    --seq-100:        #cde2fb;
+    --seq-250:        #86b6ef;
+    --seq-450:        #2a78d6;
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-serious: #ec835a;
+    --status-crit:    #d03b3b;
+    --divider-good:   #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface:        #0d0d0d;
+      --surface-card:   #1a1a19;
+      --ink-primary:    #ffffff;
+      --ink-secondary:  #c3c2b7;
+      --ink-muted:      #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --brand:          #7ea3c2;
+      --brand-ink:      #a7c4dc;
+      --brand-wash:     #1c2731;
+      --series-blue:    #3987e5;
+      --series-orange:  #d95926;
+      --series-aqua:    #199e70;
+      --series-yellow:  #c98500;
+      --seq-100:        #184f95;
+      --seq-250:        #1c5cab;
+      --seq-450:        #3987e5;
+      --status-good:    #0ca30c;
+      --status-warn:    #fab219;
+      --status-serious: #ec835a;
+      --status-crit:    #e66767;
+      --divider-good:   #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:        #0d0d0d;
+    --surface-card:   #1a1a19;
+    --ink-primary:    #ffffff;
+    --ink-secondary:  #c3c2b7;
+    --ink-muted:      #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --brand:          #7ea3c2;
+    --brand-ink:      #a7c4dc;
+    --brand-wash:     #1c2731;
+    --series-blue:    #3987e5;
+    --series-orange:  #d95926;
+    --series-aqua:    #199e70;
+    --series-yellow:  #c98500;
+    --seq-100:        #184f95;
+    --seq-250:        #1c5cab;
+    --seq-450:        #3987e5;
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-serious: #ec835a;
+    --status-crit:    #e66767;
+    --divider-good:   #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  img { max-width: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink-primary);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 0 48px; }
+  h1, h2, h3 { font-family: "Fraunces", Georgia, serif; text-wrap: balance; margin: 0; }
+
+  .topbar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    padding: 14px 20px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark { font-family: "Fraunces", serif; font-weight: 600; font-style: italic; font-size: 20px; color: var(--brand-ink); }
+  .brand .sub { color: var(--ink-muted); font-size: 12.5px; letter-spacing: .02em; }
+  .brand .source { color: var(--ink-muted); font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; margin-left: 4px; }
+  .asof { color: var(--ink-secondary); font-size: 12.5px; text-align: right; }
+  .asof b { color: var(--ink-primary); font-variant-numeric: tabular-nums; }
+
+  .hero { padding-block: 28px 8px; }
+  .hero-title { font-size: 30px; font-weight: 600; }
+  .hero-desc { color: var(--ink-secondary); max-width: 640px; margin-top: 8px; font-size: 14.5px; }
+  .hero-meta { color: var(--ink-muted); font-size: 12.5px; margin-top: 10px; }
+
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+    background: var(--gridline); border: 1px solid var(--gridline); border-radius: 10px;
+    overflow: hidden; margin-top: 22px;
+  }
+  .kpi { background: var(--surface-card); padding: 16px 16px 14px; min-width: 0; }
+  .kpi .label { color: var(--ink-muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  .kpi .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  .kpi .note { color: var(--ink-secondary); font-size: 11.5px; margin-top: 3px; }
+  .kpi.flag .value { color: var(--status-crit); }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  section { padding-block: 40px 4px; border-top: 1px solid var(--gridline); }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .eyebrow { color: var(--brand-ink); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .section-title { font-size: 22px; margin-top: 4px; }
+  .section-sub { color: var(--ink-secondary); font-size: 13.5px; max-width: 620px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; align-items: start; }
+  .grid-2-even { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 800px) { .grid-2, .grid-2-even { grid-template-columns: 1fr; } }
+
+  .panel-title { font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
+  .panel-note { color: var(--ink-muted); font-size: 12px; margin-bottom: 14px; }
+
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 12px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 12px; font-weight: 600; fill: var(--ink-primary); font-variant-numeric: tabular-nums; }
+  .bar-track { fill: var(--gridline); }
+  .axis-line { stroke: var(--baseline); stroke-width: 1; }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered, .seg.hovered { filter: brightness(1.08); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--surface-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 11px; font-size: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    color: var(--ink-primary); max-width: 240px;
+    transform: translate(-50%, -100%);
+    opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 600; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink-primary); font-variant-numeric: tabular-nums; }
+
+  .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--ink-secondary); margin-bottom: 12px; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  .callouts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin-top: 6px; }
+  @media (max-width: 800px) { .callouts { grid-template-columns: 1fr; } }
+  .callout { border-left: 3px solid var(--baseline); padding: 4px 0 4px 14px; }
+  .callout.warn { border-color: var(--status-warn); }
+  .callout.serious { border-color: var(--status-serious); }
+  .callout.good { border-color: var(--status-good); }
+  .callout.crit { border-color: var(--status-crit); }
+  .callout.info { border-color: var(--series-blue); }
+  .callout .c-head { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; }
+  .callout .c-icon { font-size: 13px; line-height: 1; }
+  .callout p { margin: 4px 0 0; color: var(--ink-secondary); font-size: 12.8px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+  .badge.CRITICAL { background: color-mix(in srgb, var(--status-crit) 18%, transparent); color: var(--status-crit); }
+  .badge.HIGH { background: color-mix(in srgb, var(--status-serious) 20%, transparent); color: var(--status-serious); }
+  .badge.MEDIUM { background: color-mix(in srgb, var(--status-warn) 25%, transparent); color: color-mix(in srgb, var(--status-warn) 70%, var(--ink-primary)); }
+  .badge.LOW { background: var(--gridline); color: var(--ink-secondary); }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12.8px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 11px; letter-spacing: .03em; text-transform: uppercase; padding: 6px 10px; border-bottom: 1px solid var(--gridline); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; vertical-align: top; }
+  table.datatable td.name { font-variant-numeric: normal; }
+  table.datatable td.desc { font-variant-numeric: normal; color: var(--ink-secondary); max-width: 420px; }
+  table.datatable tr:hover td { background: color-mix(in srgb, var(--brand-wash) 55%, transparent); }
+  .tbl-wrap { overflow-x: auto; }
+
+  footer { color: var(--ink-muted); font-size: 12px; padding-top: 30px; border-top: 1px solid var(--gridline); margin-top: 40px; }
+  footer p { max-width: 720px; }
+</style>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">Nero Platform</span>
+      <span class="sub">Cost & Security Watch</span>
+      <span class="source">live · NERO_GOVERNANCE</span>
+    </div>
+    <div class="asof" id="asOf"></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-title">Cost &amp; security watch</div>
+    <p class="hero-desc">Warehouse and Cortex spend against budget, and open Snowflake Horizon (Trust Center) findings — queried live so this reads the same thing the account itself would tell you.</p>
+    <div class="hero-meta" id="heroMeta"></div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- ============ SECTION 1: COST ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Compute cost</div>
+        <h2 class="section-title">Spend against budget, by warehouse</h2>
+      </div>
+      <p class="section-sub">Each NERO_*_WH sits behind its own resource monitor. Bars are colored by how close each one is to its monthly quota, not by warehouse identity.</p>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="panel-title">Month-to-date budget usage</div>
+        <div class="panel-note">% of monthly credit quota consumed so far</div>
+        <svg id="chartBudget" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">Daily credit burn, last 7 days</div>
+        <div class="panel-note">Stacked by warehouse</div>
+        <svg id="chartDaily" class="barchart"></svg>
+      </div>
+    </div>
+
+    <div style="margin-top:34px;">
+      <div class="panel-title">Warehouse budgets</div>
+      <div class="tbl-wrap">
+        <table class="datatable" id="budgetTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 2: SECURITY ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Horizon / Trust Center</div>
+        <h2 class="section-title">Open governance &amp; security findings</h2>
+      </div>
+      <p class="section-sub">Snowflake's own built-in scanners — MFA readiness, network policy coverage, client CVEs, admin-grant changes — read live from SNOWFLAKE.TRUST_CENTER.FINDINGS.</p>
+    </div>
+
+    <div class="grid-2-even">
+      <div>
+        <div class="panel-title">Open findings by severity</div>
+        <div class="panel-note">Unresolved scanner findings, right now</div>
+        <svg id="chartSeverity" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">All-time finding volume</div>
+        <div class="panel-note">Open vs. resolved, by severity</div>
+        <svg id="chartFindingsHistory" class="barchart"></svg>
+      </div>
+    </div>
+
+    <div style="margin-top:34px;">
+      <div class="panel-title">Open findings — detail</div>
+      <div class="tbl-wrap">
+        <table class="datatable" id="findingsTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 3: ATTENTION ============ -->
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Worth a closer look</div>
+        <h2 class="section-title">Least-privilege &amp; login checks</h2>
+      </div>
+      <p class="section-sub">Read from NERO_GOVERNANCE.SECURITY — the same views underneath this page.</p>
+    </div>
+
+    <div class="callouts" id="attentionCallouts"></div>
+  </section>
+
+  <footer>
+    <p>Cost from SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY / CORTEX_*_USAGE_HISTORY, budgeted against the resource monitors in account_setup/warehouses_and_monitors.sql. Security findings from SNOWFLAKE.TRUST_CENTER.FINDINGS. ACCOUNT_USAGE views carry replication latency of up to a few hours — treat this as a near-real-time picture, not a live meter.</p>
+  </footer>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add('show'); positionTip(evt); }
+function positionTip(evt) { const pad = 14; tooltip.style.left = evt.clientX + 'px'; tooltip.style.top = (evt.clientY - pad) + 'px'; }
+function hideTip() { tooltip.classList.remove('show'); }
+
+const fmtPct = (v) => v == null ? '—' : v.toFixed(1) + '%';
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtCredits = (v) => v == null ? '—' : v.toFixed(2);
+const fmtUsd = (v) => v == null ? '—' : '$' + v.toFixed(2);
+const fmtDate = (s) => s == null ? '—' : new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, maxOverride, tipRows, height }) {
+  const n = rows.length;
+  const rowH = height || 30;
+  const labelW = 128, valueW = 56, chartW = 380;
+  const totalW = labelW + chartW + valueW;
+  const totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.style.height = totalH + 'px';
+  const max = maxOverride || Math.max(...rows.map(valueFn), 0.0001) * 1.08;
+  svgEl.innerHTML = '';
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4;
+    const v = valueFn(row);
+    const w = Math.max((v / max) * chartW, 2);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8); label.setAttribute('y', y + rowH / 2 - 4);
+    label.setAttribute('text-anchor', 'end'); label.setAttribute('class', 'bar-row-label');
+    label.textContent = labelFn(row); svgEl.appendChild(label);
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW); track.setAttribute('y', y);
+    track.setAttribute('width', chartW); track.setAttribute('height', rowH - 10);
+    track.setAttribute('rx', 3); track.setAttribute('class', 'bar-track'); svgEl.appendChild(track);
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW); fill.setAttribute('y', y);
+    fill.setAttribute('width', w); fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('rx', 3); fill.setAttribute('fill', typeof color === 'function' ? color(row) : color);
+    fill.setAttribute('class', 'bar-fill'); svgEl.appendChild(fill);
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10); vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label'); vLabel.textContent = fmtFn(v); svgEl.appendChild(vLabel);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2);
+    hit.setAttribute('width', totalW); hit.setAttribute('height', rowH); hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, tipRows(row)); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+/* stacked vertical bar chart: one bar per group (e.g. day), segments per series */
+function renderStackedBarChart(svgEl, groups, seriesKeys, seriesColors, { tipRows }) {
+  const n = groups.length;
+  const chartH = 220, axisW = 40, topPad = 10, botPad = 24, gap = 10;
+  const totalH = chartH + topPad + botPad;
+  const barW = 34;
+  const totalW = axisW + n * (barW + gap) + gap;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.style.height = totalH + 'px';
+  svgEl.innerHTML = '';
+  const max = Math.max(...groups.map(g => seriesKeys.reduce((s, k) => s + (g[k] || 0), 0)), 0.0001) * 1.15;
+  const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  axis.setAttribute('x1', axisW); axis.setAttribute('x2', axisW);
+  axis.setAttribute('y1', topPad); axis.setAttribute('y2', topPad + chartH);
+  axis.setAttribute('class', 'axis-line'); svgEl.appendChild(axis);
+  groups.forEach((g, gi) => {
+    const x = axisW + gap + gi * (barW + gap);
+    let yCursor = topPad + chartH;
+    seriesKeys.forEach((k) => {
+      const v = g[k] || 0;
+      if (v <= 0) return;
+      const h = Math.max((v / max) * chartH - 2, 0);
+      yCursor -= (h + 2);
+      const seg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      seg.setAttribute('x', x); seg.setAttribute('y', yCursor);
+      seg.setAttribute('width', barW); seg.setAttribute('height', h);
+      seg.setAttribute('rx', 2); seg.setAttribute('fill', seriesColors[k]);
+      seg.setAttribute('class', 'seg');
+      seg.addEventListener('mousemove', (e) => { seg.classList.add('hovered'); showTip(e, tipRows(g, k)); });
+      seg.addEventListener('mouseleave', () => { seg.classList.remove('hovered'); hideTip(); });
+      svgEl.appendChild(seg);
+    });
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', x + barW / 2); label.setAttribute('y', topPad + chartH + 16);
+    label.setAttribute('text-anchor', 'middle'); label.setAttribute('class', 'bar-row-label');
+    label.textContent = g.label; svgEl.appendChild(label);
+  });
+}
+
+/* ================= HEADER ================= */
+document.getElementById('asOf').innerHTML = `Generated <b>${new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</b>`;
+document.getElementById('heroMeta').textContent = `${DATA.cost.warehouses.length} monitored warehouses · $${DATA.cost.credit_rate.toFixed(2)}/credit · ${DATA.security.open_count} open finding${DATA.security.open_count === 1 ? '' : 's'}`;
+
+/* ================= KPI ROW ================= */
+const kpis = [
+  { label: 'Total spend, lifetime', value: fmtUsd(DATA.cost.total_usd_lifetime), note: `${fmtCredits(DATA.cost.total_credits_lifetime)} credits` },
+  { label: 'Highest budget usage', value: fmtPct(DATA.cost.max_pct_warehouse ? DATA.cost.max_pct_warehouse.pct : 0), note: DATA.cost.max_pct_warehouse ? DATA.cost.max_pct_warehouse.name : '—' },
+  { label: '7-day credit burn', value: fmtCredits(DATA.cost.credits_7d), note: 'across all NERO_*_WH' },
+  { label: 'Open findings', value: fmtInt(DATA.security.open_count), note: `${DATA.security.open_critical} critical/high`, flag: DATA.security.open_critical > 0 },
+  { label: 'ACCOUNTADMIN holders', value: fmtInt(DATA.security.accountadmin_count), note: 'least-privilege check', flag: DATA.security.accountadmin_count > 0 },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `
+  <div class="kpi${k.flag ? ' flag' : ''}">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="note">${k.note}</div>
+  </div>
+`).join('');
+
+/* ================= COST CHARTS ================= */
+(function () {
+  const good = getComputedStyle(document.documentElement).getPropertyValue('--status-good').trim();
+  const warn = getComputedStyle(document.documentElement).getPropertyValue('--status-warn').trim();
+  const serious = getComputedStyle(document.documentElement).getPropertyValue('--status-serious').trim();
+  const crit = getComputedStyle(document.documentElement).getPropertyValue('--status-crit').trim();
+  const pctColor = (pct) => pct >= 100 ? crit : pct >= 75 ? serious : pct >= 50 ? warn : good;
+
+  const budgetSorted = [...DATA.cost.warehouses].sort((a, b) => b.pct - a.pct);
+  renderBarChart(document.getElementById('chartBudget'), budgetSorted, {
+    valueFn: r => r.pct, labelFn: r => r.name, fmtFn: v => v.toFixed(1) + '%',
+    color: r => pctColor(r.pct), maxOverride: 100,
+    tipRows: r => `<div class="t-title">${r.name}</div>
+      <div class="t-row"><span>Workload</span><b>${r.workload}</b></div>
+      <div class="t-row"><span>Used / Quota</span><b>${fmtCredits(r.used)} / ${fmtCredits(r.quota)} cr</b></div>
+      <div class="t-row"><span>% of budget</span><b>${fmtPct(r.pct)}</b></div>`,
+  });
+
+  const seriesKeys = DATA.cost.warehouses.map(w => w.name);
+  const palette = [
+    getComputedStyle(document.documentElement).getPropertyValue('--series-blue').trim(),
+    getComputedStyle(document.documentElement).getPropertyValue('--series-orange').trim(),
+    getComputedStyle(document.documentElement).getPropertyValue('--series-aqua').trim(),
+    getComputedStyle(document.documentElement).getPropertyValue('--series-yellow').trim(),
+  ];
+  const seriesColors = {};
+  seriesKeys.forEach((k, i) => seriesColors[k] = palette[i % palette.length]);
+
+  const groups = DATA.cost.daily_by_warehouse.map(d => ({ label: fmtDate(d.date), date: d.date, ...d.credits }));
+  renderStackedBarChart(document.getElementById('chartDaily'), groups, seriesKeys, seriesColors, {
+    tipRows: (g, k) => `<div class="t-title">${fmtDate(g.date)}</div>
+      <div class="t-row"><span>${k}</span><b>${fmtCredits(g[k])} cr</b></div>`,
+  });
+  document.getElementById('chartDaily').insertAdjacentHTML('beforebegin', `
+    <div class="legend">${seriesKeys.map(k => `<span class="sw"><span class="dot" style="background:${seriesColors[k]}"></span>${k}</span>`).join('')}</div>
+  `);
+
+  const btbl = document.getElementById('budgetTable');
+  btbl.innerHTML = `<thead><tr><th>Warehouse</th><th>Workload</th><th>Quota (cr)</th><th>Used MTD (cr)</th><th>% used</th></tr></thead>
+    <tbody>${budgetSorted.map(r => `<tr><td class="name">${r.name}</td><td>${r.workload}</td><td>${fmtCredits(r.quota)}</td><td>${fmtCredits(r.used)}</td><td>${fmtPct(r.pct)}</td></tr>`).join('')}</tbody>`;
+})();
+
+/* ================= SECURITY CHARTS ================= */
+(function () {
+  const good = getComputedStyle(document.documentElement).getPropertyValue('--status-good').trim();
+  const warn = getComputedStyle(document.documentElement).getPropertyValue('--status-warn').trim();
+  const serious = getComputedStyle(document.documentElement).getPropertyValue('--status-serious').trim();
+  const crit = getComputedStyle(document.documentElement).getPropertyValue('--status-crit').trim();
+  const sevColor = { CRITICAL: crit, HIGH: serious, MEDIUM: warn, LOW: good };
+  const sevOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+  const sevRows = Object.entries(DATA.security.open_by_severity)
+    .map(([sev, n]) => ({ severity: sev, count: n }))
+    .sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
+  renderBarChart(document.getElementById('chartSeverity'), sevRows, {
+    valueFn: r => r.count, labelFn: r => r.severity, fmtFn: v => fmtInt(v),
+    color: r => sevColor[r.severity] || good, height: 34,
+    tipRows: r => `<div class="t-title">${r.severity}</div><div class="t-row"><span>Open findings</span><b>${fmtInt(r.count)}</b></div>`,
+  });
+
+  const histRows = DATA.security.findings_history; // [{severity, open, resolved}]
+  renderBarChart(document.getElementById('chartFindingsHistory'), histRows, {
+    valueFn: r => r.open + r.resolved, labelFn: r => r.severity, fmtFn: (v) => fmtInt(v),
+    color: r => sevColor[r.severity] || good, height: 34,
+    tipRows: r => `<div class="t-title">${r.severity}</div>
+      <div class="t-row"><span>Open</span><b>${fmtInt(r.open)}</b></div>
+      <div class="t-row"><span>Resolved</span><b>${fmtInt(r.resolved)}</b></div>`,
+  });
+
+  const ftbl = document.getElementById('findingsTable');
+  if (DATA.security.open_findings.length === 0) {
+    ftbl.innerHTML = `<tbody><tr><td style="color:var(--ink-muted)">No open findings.</td></tr></tbody>`;
+  } else {
+    ftbl.innerHTML = `<thead><tr><th>Scanner</th><th>Severity</th><th>Risk</th><th>Opened</th></tr></thead>
+      <tbody>${DATA.security.open_findings.map(f => `<tr>
+        <td class="name">${f.scanner_name}</td>
+        <td><span class="badge ${f.severity}">${f.severity}</span></td>
+        <td class="desc">${(f.risk_description || '').trim().slice(0, 220)}${(f.risk_description || '').length > 220 ? '…' : ''}</td>
+        <td>${fmtDate(f.created_on)}</td>
+      </tr>`).join('')}</tbody>`;
+  }
+})();
+
+/* ================= ATTENTION CALLOUTS ================= */
+(function () {
+  const c = [];
+  if (DATA.security.accountadmin_count > 0) {
+    c.push(`<div class="callout crit">
+      <div class="c-head"><span class="c-icon">⚑</span> ${DATA.security.accountadmin_count} user${DATA.security.accountadmin_count === 1 ? '' : 's'} hold${DATA.security.accountadmin_count === 1 ? 's' : ''} ACCOUNTADMIN</div>
+      <p>${DATA.security.accountadmin_users.join(', ')} — currently the same identity driving ingestion, CI/CD and dbt. Giving each workload its own least-privilege role is the standing follow-up.</p>
+    </div>`);
+  }
+  c.push(`<div class="callout ${DATA.security.failed_logins_30d > 0 ? 'warn' : 'good'}">
+    <div class="c-head"><span class="c-icon">${DATA.security.failed_logins_30d > 0 ? '⚑' : '✓'}</span> ${fmtInt(DATA.security.failed_logins_30d)} failed login${DATA.security.failed_logins_30d === 1 ? '' : 's'}, last 30 days</div>
+    <p>${DATA.security.failed_logins_30d > 0 ? `Across ${fmtInt(DATA.security.failed_login_users)} user(s). Check SECURITY.LOGIN_HISTORY_RECENT for source IPs if this climbs.` : 'No failed login attempts recorded in the last 30 days.'}</p>
+  </div>`);
+  c.push(`<div class="callout ${DATA.cost.max_pct_warehouse && DATA.cost.max_pct_warehouse.pct >= 75 ? 'warn' : 'good'}">
+    <div class="c-head"><span class="c-icon">◆</span> Budget headroom</div>
+    <p>${DATA.cost.max_pct_warehouse ? `${DATA.cost.max_pct_warehouse.name} is furthest along its monthly quota at ${fmtPct(DATA.cost.max_pct_warehouse.pct)}.` : 'No usage yet this month.'} All four warehouses carry their own resource monitor, so none can overrun without the others noticing budget pressure independently.</p>
+  </div>`);
+  c.push(`<div class="callout info">
+    <div class="c-head"><span class="c-icon">◆</span> Cortex spend</div>
+    <p>${DATA.cost.cortex_credits_lifetime > 0 ? `${fmtCredits(DATA.cost.cortex_credits_lifetime)} credits (${fmtUsd(DATA.cost.cortex_credits_lifetime * DATA.cost.credit_rate)}) from Cortex Code CLI / LLM functions to date.` : 'No Cortex product has been invoked against this account yet — nothing to report from CORTEX_CREDITS_DAILY.'}</p>
+  </div>`);
+  document.getElementById('attentionCallouts').innerHTML = c.join('');
+})();
+
+document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });
+</script>

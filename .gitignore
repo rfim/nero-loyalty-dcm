@@ -4,3 +4,4 @@ out/
 .snowflake/
 __pycache__/
 streamlit_app/output/
+governance_app/output/
