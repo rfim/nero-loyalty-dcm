@@ -1,0 +1,78 @@
+version: 2
+contract_id: nero_loyalty_contract
+wire_format: nero_snapshot_v2
+
+# Platform-level ingestion config, merged in from the guide's separate
+# deployment.yaml. Only source.type=internal_stage + landing.type=native is
+# deployed/tested — the s3 block is schema-valid and the generator emits real
+# SQL for it, but it's UNVERIFIED (no live AWS credentials in this account).
+ingestion:
+  source:
+    type: internal_stage          # internal_stage | s3
+    file_pattern: ".*[.]jsonl"
+    on_error: ABORT_STATEMENT
+    internal_stage:
+      stage_name: NERO_DB.NERO_LOYALTY.LANDING_STAGE
+    s3:
+      stage_name: NERO_DB.NERO_LOYALTY.S3_STAGE
+      integration_name: NERO_S3_INTEGRATION
+      bucket_url: "s3://REPLACE_BUCKET/nero/"
+      aws_role_arn: "arn:aws:iam::123456789012:role/REPLACE_ROLE"
+      auto_ingest: true
+      pipe_name: NERO_DB.NERO_LOYALTY.CONTRACT_PIPE
+  landing:
+    type: native                  # native | iceberg
+    table_name: NERO_DB.NERO_LOYALTY.RAW_ENVELOPES
+    iceberg:
+      external_volume: SNOWFLAKE_MANAGED
+      base_location: nero/raw/envelopes
+
+freshness:
+  max_snapshot_age_minutes: 60
+
+datasets:
+  stores:
+    primary_key: [store_id]
+    owners: {source_owner: store-ops-platform, consumer_owner: data-platform-team}
+    columns:
+      store_id:    {type: integer, nullable: false, example: 1042}
+      store_name:  {type: string,  nullable: false, max_length: 200, example: "Manchester Deansgate"}
+      region:      {type: string,  nullable: false, max_length: 100, example: "North West"}
+      format:      {type: string,  nullable: false, enum: [High street, Drive-thru, Travel], example: "High street"}
+      opened_date: {type: date,    nullable: false, example: "2019-03-11"}
+
+  loyalty_customers:
+    primary_key: [customer_id]
+    owners: {source_owner: loyalty-platform, consumer_owner: marketing-analytics}
+    columns:
+      customer_id:   {type: integer, nullable: false, pii: true, pii_kind: identifier, example: 55291}
+      signup_date:   {type: date,    nullable: false, example: "2026-05-02"}
+      tier:          {type: string,  nullable: false, enum: [Bronze, Silver, Gold], example: "Bronze"}
+      home_store_id: {type: integer, nullable: true, foreign_key: {dataset: stores, column: store_id}, example: 1042}
+
+  transactions:
+    primary_key: [transaction_id]
+    owners: {source_owner: pos-platform, consumer_owner: store-operations}
+    columns:
+      transaction_id: {type: integer,     nullable: false, example: 8834021}
+      store_id:       {type: integer,     nullable: false, foreign_key: {dataset: stores, column: store_id}, example: 1042}
+      transaction_ts: {type: timestamp_tz, nullable: false, example: "2026-06-14T08:12:03+01:00"}
+      customer_id:    {type: integer,     nullable: true, pii: true, pii_kind: identifier, foreign_key: {dataset: loyalty_customers, column: customer_id}, example: 55291}
+      basket_total:   {type: decimal,     nullable: false, precision: 8, scale: 2, example: "6.85"}
+      item_count:     {type: integer,     nullable: false, example: 2}
+      payment_type:   {type: string,      nullable: false, enum: [Card, App, Cash], example: "Card"}
+
+  loyalty_events:
+    primary_key: [event_id]
+    owners: {source_owner: loyalty-platform, consumer_owner: marketing-analytics}
+    columns:
+      event_id:    {type: integer,      nullable: false, example: 990233}
+      customer_id: {type: integer,      nullable: false, pii: true, pii_kind: identifier, foreign_key: {dataset: loyalty_customers, column: customer_id}, example: 55291}
+      event_ts:    {type: timestamp_tz, nullable: false, example: "2026-05-20T09:41:10+01:00"}
+      event_type:  {type: string,       nullable: false, enum: [signup, earn, redeem, tier_change], example: "redeem"}
+      reward_id:   {type: integer,      nullable: true, example: 204}
+      store_id:    {type: integer,      nullable: true, foreign_key: {dataset: stores, column: store_id}, example: 1042}
+    policies:
+      - kind: required_if
+        column: reward_id
+        when: {column: event_type, equals: redeem}

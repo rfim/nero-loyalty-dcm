@@ -25,15 +25,15 @@ import uuid
 from datetime import datetime, date
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 POINTER_NAME = "LOYALTY_SNAPSHOT"
 
-DATASET_TABLES = {
-    "stores": "NERO_DB.NERO_LOYALTY.VALIDATED_STORES",
-    "loyalty_customers": "NERO_DB.NERO_LOYALTY.VALIDATED_LOYALTY_CUSTOMERS",
-    "transactions": "NERO_DB.NERO_LOYALTY.VALIDATED_TRANSACTIONS",
-    "loyalty_events": "NERO_DB.NERO_LOYALTY.VALIDATED_LOYALTY_EVENTS",
-}
+
+def _validated_table(dataset_name: str) -> str:
+    # Naming convention, not a lookup table: tools/build.py generates
+    # VALIDATED_<DATASET> for every dataset in the contract, so adding a
+    # dataset needs no change here — only the contract + a rebuild.
+    return f"NERO_DB.NERO_LOYALTY.VALIDATED_{dataset_name.upper()}"
 
 
 def _audit(session, batch_id, run_id, status, details):
@@ -229,7 +229,8 @@ def run(session, batch_id: str) -> dict:
                        {"reason": "batch is not newer than current release",
                         "current_release_at": str(current_release_at), "batch_captured_at": captured_at})
 
-    for ds, table in DATASET_TABLES.items():
+    for ds in dataset_specs:
+        table = _validated_table(ds)
         cols = list(dataset_specs[ds]["columns"].keys())
         session.sql(f"DELETE FROM {table}").collect()
         if validated_rows[ds]:
