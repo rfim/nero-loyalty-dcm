@@ -1,0 +1,46 @@
+definition_version: "2"
+entities:
+  nero_marketing_assistant:
+    type: streamlit
+    identifier: {name: MARKETING_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: marketing_assistant.py
+    artifacts: [marketing_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Marketing Assistant"
+
+  nero_ops_assistant:
+    type: streamlit
+    identifier: {name: OPS_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: ops_assistant.py
+    artifacts: [ops_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Store Operations Assistant"
+
+  nero_finance_assistant:
+    type: streamlit
+    identifier: {name: FINANCE_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: finance_assistant.py
+    artifacts: [finance_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Finance Assistant"
+
+  nero_security_lead_assistant:
+    type: streamlit
+    identifier: {name: SECURITY_LEAD_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: security_lead_assistant.py
+    artifacts: [security_lead_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Security Assistant"
+
+  nero_platform_lead_assistant:
+    type: streamlit
+    identifier: {name: PLATFORM_LEAD_ASSISTANT, schema: APPS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: platform_lead_assistant.py
+    artifacts: [platform_lead_assistant.py, persona_core.py, chat_store.py, chat_export.py, requirements.txt]
+    title: "Nero Platform Assistant"
