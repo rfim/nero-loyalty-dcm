@@ -1,0 +1,54 @@
+-- =============================================================================
+-- Grant ACCOUNTADMIN USAGE on every Streamlit app so it can be opened in
+-- Snowsight under that role.
+--
+-- Every app in streamlit_apps/ is deliberately owned by a scoped
+-- least-privilege role, not ACCOUNTADMIN (see account_setup/
+-- streamlit_apps_reorg.sql) -- and Snowflake gives ACCOUNTADMIN no implicit
+-- access to objects it doesn't own (confirmed: `SHOW GRANTS ON STREAMLIT`
+-- for any of these returned only the owning role's OWNERSHIP grant, nothing
+-- for ACCOUNTADMIN). That's correct for the data-access boundary each app
+-- enforces, but it also means whoever administers this account day to day
+-- under ACCOUNTADMIN got "Insufficient privileges to operate on streamlit"
+-- trying to open any of them from Snowsight.
+--
+-- USAGE is the minimum fix: it lets ACCOUNTADMIN launch/view an app (which
+-- still executes as its owning role, per Snowflake's Streamlit execution
+-- model -- USAGE doesn't grant the underlying data access, just the
+-- ability to open it), without touching ownership or the role's own grants.
+--
+-- Idempotent: safe to re-run. Apply with:
+--   snow sql -f account_setup/streamlit_apps_accountadmin_usage.sql
+-- =============================================================================
+
+USE ROLE ACCOUNTADMIN;
+
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_DASHBOARDS.COST_GOVERNANCE_REPORT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_DASHBOARDS.LOYALTY_TRADING_PULSE TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_DASHBOARDS.SECURITY_GOVERNANCE_REPORT TO ROLE ACCOUNTADMIN;
+
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_CHATBOTS.CHATBOT_COST_GOVERNANCE_REPORT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_CHATBOTS.CHATBOT_SECURITY_GOVERNANCE_REPORT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_CHATBOTS.NERO_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_CHATBOTS.NERO_GOVERNANCE_ASSISTANT TO ROLE ACCOUNTADMIN;
+
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.AUDIT_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.CDO_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.CEO_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.CX_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.FINANCE_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.MARKETING_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.OPS_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.PLATFORM_LEAD_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.REGIONAL_ASSISTANT TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON STREAMLIT NERO_GOVERNANCE.APPS_LEADERS.SECURITY_LEAD_ASSISTANT TO ROLE ACCOUNTADMIN;
+
+-- These are per-object grants, so any new app added under streamlit_apps/
+-- needs its own `GRANT USAGE ON STREAMLIT ... TO ROLE ACCOUNTADMIN` line
+-- added here -- unless the equivalent FUTURE grant is added per schema:
+--   GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA NERO_GOVERNANCE.APPS_DASHBOARDS TO ROLE ACCOUNTADMIN;
+--   GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA NERO_GOVERNANCE.APPS_CHATBOTS TO ROLE ACCOUNTADMIN;
+--   GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA NERO_GOVERNANCE.APPS_LEADERS TO ROLE ACCOUNTADMIN;
+-- (confirmed supported syntax) -- left out of this file for now since it's
+-- a broader standing grant than the immediate fix called for; add it if
+-- new apps having to be listed here individually becomes annoying.
