@@ -3,31 +3,39 @@
 dbt owns everything downstream of the DCM-validated source tables:
 staging, customer SCD2, Kimball dimensions/facts, and reporting marts.
 Snowflake DCM (see `../sources/definitions/`) owns ingestion, contract
-validation, and the `VALIDATED_*` tables — **DCM and dbt never manage the
-same fully qualified table.**
+validation, and the `01_SILVER.VALIDATED_*` tables — **DCM and dbt never
+manage the same fully qualified table.**
 
 ## Ownership boundary
 
 | Capability | Owner |
 |---|---|
-| File format, stage, raw landing | Snowflake DCM |
-| Data contract, validation, release pointer | Snowflake DCM |
-| `NERO_DB.NERO_LOYALTY.VALIDATED_*` | Snowflake DCM |
+| Raw landing (`00_BRONZE`) | Snowflake DCM |
+| Contract, audit, release pointer, engine (`02_CONTROL`) | Snowflake DCM |
+| Validated tables (`01_SILVER`) | Snowflake DCM |
+| Lineage / PII registry (`03_LINEAGE`, `05_PII_CONTROL`) | Snowflake DCM |
 | Staging and conformance | dbt |
 | Customer SCD Type 2 | dbt snapshot + model |
 | Kimball dimensions and facts | dbt |
 | Marketing / operations marts | dbt |
 | Dashboard | Streamlit, reads dbt marts |
 
-Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT` only on
-`NERO_DB.NERO_LOYALTY` (verified directly — a `CREATE TABLE` there as
-`NERO_DBT_ROLE` fails with `Insufficient privileges`), and owns
-`NERO_ANALYTICS` outright.
+Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT`-only on
+`NERO_DB."01_SILVER"` (all tables + future tables) and
+`NERO_DB."02_CONTROL".CONTROL_RELEASE_POINTER` — nothing else in
+`NERO_DB` — verified directly (a `CREATE TABLE` there as `NERO_DBT_ROLE`
+fails with `Insufficient privileges`), and owns `NERO_ANALYTICS` outright.
 
 ## Databases and schemas
 
 ```
-NERO_DB.NERO_LOYALTY              DCM-owned ingestion + validated sources
+NERO_DB."00_BRONZE"                raw landing (DCM)
+NERO_DB."01_SILVER"                contract-validated tables (DCM)
+NERO_DB."02_CONTROL"               contract, audit, release pointer, engine (DCM)
+NERO_DB."03_LINEAGE"               pipeline stage/dependency documentation (DCM)
+NERO_DB."04_METADATA"              ingestion freshness/reporting (DCM)
+NERO_DB."05_PII_CONTROL"           PII column registry (DCM)
+NERO_DB.NERO_LOYALTY               Streamlit app + its stage only — the "front door"
 
 NERO_ANALYTICS."00_STAGING"       one stg_* view per validated source
 NERO_ANALYTICS."01_SNAPSHOTS"     dbt snapshot (customer tier history)
@@ -37,12 +45,15 @@ NERO_ANALYTICS."04_MART_OPERATIONS"
 ```
 
 Numbered so Snowsight's alphabetical schema listing reads in pipeline
-order. All owned by `NERO_DBT_ROLE`. Quoted identifiers, since Snowflake
-requires quoting a name starting with a digit — `dbt_project.yml` sets
-`quoting.schema: true` project-wide for this reason, and the case must
-match exactly (quoted identifiers are case-sensitive). No `INTERMEDIATE`
-or `AUDIT` schema — both were provisioned in PR1 speculatively and never
-used by any model, so they were dropped rather than carried forward.
+order, on both sides. Quoted identifiers, since Snowflake requires
+quoting a name starting with a digit; the case must match exactly
+(quoted identifiers are case-sensitive) — `dbt_project.yml` sets
+`quoting.schema: true` project-wide, but `sources.yml` needs the quotes
+written literally into the schema string, since project-level quoting
+doesn't cascade to sources. No `INTERMEDIATE` or `AUDIT` schema on the
+dbt side, and no legacy `DIM_*`/`FACT_*` star schema on the DCM side —
+all were either never used or superseded by dbt's own gold layer, and
+were dropped rather than carried forward.
 
 ## Local setup
 
@@ -73,11 +84,14 @@ authoritative record. Summary:
    `mart_reward_redemption_daily`.
 7. **CI**: PR builds into an isolated `DBT_CI_<PR_NUMBER>` schema; prod runs after
    DCM deploy + contract seed + ingestion smoke test, before Streamlit deploy.
-8. **Streamlit cutover**: dashboard reads only `NERO_ANALYTICS.MART_*`.
-9. **Retire `sources/definitions/star_schema.sql`**: only after multi-release
-   reconciliation between the old DCM star schema and the new dbt marts passes.
+8. **Streamlit cutover** (done): dashboard reads only `NERO_ANALYTICS."02_GOLD"`/`"03_MART_MARKETING"`/`"04_MART_OPERATIONS"`.
+9. **Retire the legacy DCM star schema** (done): `sources/definitions/star_schema.sql`
+   removed and its `DIM_*`/`FACT_*` tables dropped, pulled forward alongside the
+   `NERO_DB` schema restructuring rather than waiting for the original multi-release
+   reconciliation gate — acceptable since the data involved was still synthetic
+   smoke-test rows, not real production history.
 
-Real reconciliation (steps 3+) needs actual data volume in `VALIDATED_*` —
+Real reconciliation still needs actual data volume in `01_SILVER.VALIDATED_*` —
 right now it holds only synthetic smoke-test rows from
 `ingestion/smoke_test.py`.
 

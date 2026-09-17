@@ -89,21 +89,21 @@ def upload_and_process(connection, batch_id, lines):
     local_path.write_text("\n".join(lines) + "\n")
 
     subprocess.run(["snow", "stage", "copy", str(local_path),
-                     "@NERO_DB.NERO_LOYALTY.LANDING_STAGE", "--overwrite", "-c", connection], check=True)
+                     "@NERO_DB.\"00_BRONZE\".LANDING_STAGE", "--overwrite", "-c", connection], check=True)
 
     copy_sql = f"""
-    COPY INTO NERO_DB.NERO_LOYALTY.RAW_ENVELOPES (PAYLOAD, FILE_NAME, FILE_ROW_NUMBER, FILE_CONTENT_KEY)
+    COPY INTO NERO_DB."00_BRONZE".RAW_ENVELOPES (PAYLOAD, FILE_NAME, FILE_ROW_NUMBER, FILE_CONTENT_KEY)
     FROM (
         SELECT TO_JSON($1), METADATA$FILENAME, METADATA$FILE_ROW_NUMBER, METADATA$FILE_CONTENT_KEY
-        FROM @NERO_DB.NERO_LOYALTY.LANDING_STAGE
+        FROM @NERO_DB."00_BRONZE".LANDING_STAGE
     )
     FILES = ('{batch_id}.jsonl')
-    FILE_FORMAT = (FORMAT_NAME = NERO_DB.NERO_LOYALTY.JSON_LINES)
+    FILE_FORMAT = (FORMAT_NAME = NERO_DB."00_BRONZE".JSON_LINES)
     ON_ERROR = 'ABORT_STATEMENT';
     """
     subprocess.run(["snow", "sql", "-c", connection, "-q", copy_sql], check=True)
 
-    call_sql = f"CALL NERO_DB.NERO_LOYALTY.PROCESS_BATCH('{batch_id}');"
+    call_sql = f"CALL NERO_DB.\"02_CONTROL\".PROCESS_BATCH('{batch_id}');"
     result = subprocess.run(["snow", "sql", "-c", connection, "--format", "JSON", "-q", call_sql],
                              check=True, capture_output=True, text=True)
     return result.stdout
