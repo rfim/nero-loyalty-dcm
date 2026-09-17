@@ -1,1 +1,4 @@
 snowflake
+reportlab
+xlsxwriter
+pandas
