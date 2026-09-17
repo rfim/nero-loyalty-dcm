@@ -1,6 +1,10 @@
 """CISO / Security lead persona. Owned by NERO_SECURITY_LEAD_ROLE, granted
 ONLY the security findings search -- no business or cost data reachable
 at all, the narrowest of the 5 personas."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({
