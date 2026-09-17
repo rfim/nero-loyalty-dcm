@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""Generator: contracts/loyalty.yaml -> generated DCM SQL + reference SQL.
+"""Generator: contracts/loyalty.yaml -> generated DCM SQL + reference SQL,
+and (with --seed) loads the contract into CONTROL_DATA_CONTRACTS.
 
 Reads the single unified contract (business rules + ingestion strategy +
 PII tags) and emits:
-  - sources/definitions/contract_raw.sql          (DCM-managed, deployed)
+  - sources/definitions/contract_raw.sql              (DCM-managed, deployed)
   - sources/definitions/contract_validated_tables.sql (DCM-managed, deployed)
-  - sources/definitions/contract_masking.sql       (DCM-managed, deployed —
-    defines masking policies; DCM does not yet support attaching them to
-    columns, so attachment is a separate manual step, see below)
-  - generated_reference/s3_ingestion.sql           (NOT in sources/definitions,
-    so DCM ignores it — real SQL, but UNVERIFIED: no live AWS credentials in
-    this account to test the s3/Snowpipe route)
-  - generated_reference/attach_masking_policies.sql (NOT DCM-managed — column
-    attachment isn't a supported DCM primitive yet; run manually after review)
+  - generated_reference/s3_ingestion.sql       (NOT in sources/definitions, so
+    DCM ignores it — real SQL, but UNVERIFIED: no live AWS credentials here)
+  - generated_reference/masking_policies.sql   (real SQL for PII masking +
+    the column-attach step, also UNVERIFIED: this Snowflake account's edition
+    doesn't support masking policies at all, confirmed independent of DCM)
 
 Only ingestion.source.type=internal_stage + ingestion.landing.type=native is
 deployed and tested end-to-end. Rejects unknown keys at every level so a typo
 in the contract fails the build instead of silently doing nothing.
 
-Usage: python tools/build.py
+Usage:
+    python tools/build.py                              # generate only
+    python tools/build.py --seed -c <snow_connection>   # generate + seed
 """
+import argparse
 import hashlib
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -188,63 +191,56 @@ def gen_validated_tables(doc):
     return "\n".join(lines) + "\n"
 
 
-def gen_masking_policies(doc):
-    pii_types = set()
-    for ds in doc["datasets"].values():
-        for col in ds["columns"].values():
+def gen_masking_reference(doc):
+    """One reference file: policy definitions + the column-attach step. Both
+    UNVERIFIED on this account (masking policies aren't supported by its
+    edition at all — confirmed directly, independent of DCM), and DCM doesn't
+    yet support attaching a policy to a column even where it is supported."""
+    pii_cols = []  # (dataset, column, sql_type, pii_kind)
+    for ds_name, ds in doc["datasets"].items():
+        for col_name, col in ds["columns"].items():
             if col.get("pii"):
-                pii_types.add((col["type"], col.get("pii_kind", "identifier")))
+                pii_cols.append((ds_name, col_name, col["type"], col.get("pii_kind", "identifier")))
 
-    if not pii_types:
+    if not pii_cols:
         return None
 
+    pii_types = sorted({(t, k) for _, _, t, k in pii_cols})
     lines = [
         "-- UNVERIFIED — reference only, not deployed by DCM (lives outside sources/definitions).",
         "-- This Snowflake account's edition does not support masking policies at all —",
         "-- confirmed directly: `CREATE MASKING POLICY ...` errors with",
         "-- \"Unsupported feature 'MASKING POLICY'\" independent of DCM. This SQL is",
-        "-- correct standard syntax; move it into sources/definitions/ once run on an",
-        "-- edition that supports masking policies (Enterprise+), then also wire",
-        "-- generated_reference/attach_masking_policies.sql into a reviewed deploy step.",
+        "-- correct standard syntax; move the DEFINE block into sources/definitions/",
+        "-- once run on an edition that supports masking policies (Enterprise+).",
+        "--",
+        "-- The ALTER TABLE block below is a further MANUAL step even then: DCM's",
+        "-- DEFINE MASKING POLICY only creates the policy, not attaching it to a",
+        "-- column — that isn't a supported DCM primitive yet.",
+        "",
+        "-- ---- policy definitions ----",
         "",
     ]
-    for sql_type, pii_kind in sorted(pii_types):
+    for sql_type, pii_kind in pii_types:
         policy_name = f"{DB_SCHEMA}.MASK_{pii_kind.upper()}_{sql_type.upper()}"
         col_type = "NUMBER" if sql_type == "integer" else "VARCHAR"
-        null_literal = "NULL"
         lines += [
             f"DEFINE MASKING POLICY {policy_name} AS (val {col_type}) RETURNS {col_type} ->",
             "    CASE",
             "        WHEN CURRENT_ROLE() IN ('ACCOUNTADMIN') THEN val",
-            f"        ELSE {null_literal}",
+            "        ELSE NULL",
             "    END",
             f"COMMENT = 'Masks {pii_kind} columns of type {sql_type} for any role other than ACCOUNTADMIN.';",
             "",
         ]
-    return "\n".join(lines)
 
-
-def gen_attach_masking_reference(doc):
-    attachments = []
-    for ds_name, ds in doc["datasets"].items():
+    lines.append("-- ---- attach to columns (manual, after the policies above are deployed) ----")
+    lines.append("")
+    for ds_name, col_name, sql_type, pii_kind in pii_cols:
         table = f"{DB_SCHEMA}.VALIDATED_{ds_name.upper()}"
-        for col_name, col in ds["columns"].items():
-            if col.get("pii"):
-                sql_type = col["type"]
-                pii_kind = col.get("pii_kind", "identifier")
-                policy = f"{DB_SCHEMA}.MASK_{pii_kind.upper()}_{sql_type.upper()}"
-                attachments.append(
-                    f"ALTER TABLE {table} MODIFY COLUMN {col_name.upper()} SET MASKING POLICY {policy};"
-                )
-    if not attachments:
-        return None
-    lines = [
-        "-- MANUAL STEP — not run by CI, not DCM-managed.",
-        "-- DCM's DEFINE MASKING POLICY only creates the policy; attaching it to a",
-        "-- column isn't yet a supported DCM primitive. Review and run this by hand",
-        "-- (or via a reviewed post_deploy.sql) after the policy + table are deployed.",
-        "",
-    ] + attachments
+        policy = f"{DB_SCHEMA}.MASK_{pii_kind.upper()}_{sql_type.upper()}"
+        lines.append(f"ALTER TABLE {table} MODIFY COLUMN {col_name.upper()} SET MASKING POLICY {policy};")
+
     return "\n".join(lines) + "\n"
 
 
@@ -289,33 +285,46 @@ def gen_s3_reference(doc):
     return "\n".join(lines) + "\n"
 
 
+def seed(connection, doc, raw_bytes, contract_hash):
+    """Loads the contract into CONTROL_DATA_CONTRACTS (data-plane, outside
+    DCM's schema-only scope). Additive: an existing contract_id+version is
+    left alone, so bumping `version` in the YAML is how you publish a change."""
+    contract_json_text = json.dumps(doc)
+    sql = f"""
+    INSERT INTO NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS (CONTRACT_ID, VERSION, CONTRACT_JSON, CONTRACT_HASH)
+    SELECT '{doc["contract_id"]}', {doc["version"]}, PARSE_JSON($${contract_json_text}$$), '{contract_hash}'
+    WHERE NOT EXISTS (
+        SELECT 1 FROM NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS
+        WHERE CONTRACT_ID = '{doc["contract_id"]}' AND VERSION = {doc["version"]}
+    );
+    """
+    subprocess.run(["snow", "sql", "-c", connection, "-q", sql], check=True)
+    print(f"Seeded {doc['contract_id']} v{doc['version']}, hash={contract_hash}")
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", action="store_true", help="also load the contract into CONTROL_DATA_CONTRACTS")
+    parser.add_argument("-c", "--connection", help="snow CLI connection name (required with --seed)")
+    args = parser.parse_args()
+    if args.seed and not args.connection:
+        sys.exit("build.py: --seed requires -c/--connection")
+
     doc, raw_bytes, contract_hash = load_contract()
 
     definitions_dir = ROOT / "sources" / "definitions"
     reference_dir = ROOT / "generated_reference"
     reference_dir.mkdir(exist_ok=True)
 
-    old_masking = definitions_dir / "contract_masking.sql"
-    if old_masking.exists():
-        old_masking.unlink()
-
     (definitions_dir / "contract_raw.sql").write_text(gen_raw_landing(doc))
     (definitions_dir / "contract_validated_tables.sql").write_text(gen_validated_tables(doc))
 
-    masking_sql = gen_masking_policies(doc)
+    masking_sql = gen_masking_reference(doc)
     masking_path = reference_dir / "masking_policies.sql"
     if masking_sql:
         masking_path.write_text(masking_sql)
     elif masking_path.exists():
         masking_path.unlink()
-
-    attach_sql = gen_attach_masking_reference(doc)
-    attach_path = reference_dir / "attach_masking_policies.sql"
-    if attach_sql:
-        attach_path.write_text(attach_sql)
-    elif attach_path.exists():
-        attach_path.unlink()
 
     (reference_dir / "s3_ingestion.sql").write_text(gen_s3_reference(doc))
 
@@ -327,8 +336,9 @@ def main():
     print("  generated_reference/s3_ingestion.sql (unverified — no live AWS credentials)")
     if masking_sql:
         print("  generated_reference/masking_policies.sql (unverified — account edition lacks masking policy support)")
-    if attach_sql:
-        print("  generated_reference/attach_masking_policies.sql (manual step, blocked on the above)")
+
+    if args.seed:
+        seed(args.connection, doc, raw_bytes, contract_hash)
 
 
 if __name__ == "__main__":
