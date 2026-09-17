@@ -1,0 +1,57 @@
+{
+  "contract_id": "nero_loyalty_contract",
+  "version": 1,
+  "wire_format": "nero_snapshot_v2",
+  "datasets": {
+    "stores": {
+      "primary_key": ["store_id"],
+      "columns": {
+        "store_id":     {"type": "integer", "nullable": false},
+        "store_name":   {"type": "string",  "nullable": false, "max_length": 200},
+        "region":       {"type": "string",  "nullable": false, "max_length": 100},
+        "format":       {"type": "string",  "nullable": false, "enum": ["High street", "Drive-thru", "Travel"]},
+        "opened_date":  {"type": "date",    "nullable": false}
+      },
+      "owners": {"source_owner": "store-ops-platform", "consumer_owner": "data-platform-team"}
+    },
+    "loyalty_customers": {
+      "primary_key": ["customer_id"],
+      "columns": {
+        "customer_id":   {"type": "integer", "nullable": false},
+        "signup_date":   {"type": "date",    "nullable": false},
+        "tier":          {"type": "string",  "nullable": false, "enum": ["Bronze", "Silver", "Gold"]},
+        "home_store_id": {"type": "integer", "nullable": true, "foreign_key": {"dataset": "stores", "column": "store_id"}}
+      },
+      "owners": {"source_owner": "loyalty-platform", "consumer_owner": "marketing-analytics"}
+    },
+    "transactions": {
+      "primary_key": ["transaction_id"],
+      "columns": {
+        "transaction_id":  {"type": "integer", "nullable": false},
+        "store_id":        {"type": "integer", "nullable": false, "foreign_key": {"dataset": "stores", "column": "store_id"}},
+        "transaction_ts":  {"type": "timestamp_tz", "nullable": false},
+        "customer_id":     {"type": "integer", "nullable": true, "foreign_key": {"dataset": "loyalty_customers", "column": "customer_id"}},
+        "basket_total":    {"type": "decimal", "precision": 8, "scale": 2, "nullable": false},
+        "item_count":      {"type": "integer", "nullable": false},
+        "payment_type":    {"type": "string",  "nullable": false, "enum": ["Card", "App", "Cash"]}
+      },
+      "owners": {"source_owner": "pos-platform", "consumer_owner": "store-operations"}
+    },
+    "loyalty_events": {
+      "primary_key": ["event_id"],
+      "columns": {
+        "event_id":     {"type": "integer", "nullable": false},
+        "customer_id":  {"type": "integer", "nullable": false, "foreign_key": {"dataset": "loyalty_customers", "column": "customer_id"}},
+        "event_ts":     {"type": "timestamp_tz", "nullable": false},
+        "event_type":   {"type": "string",  "nullable": false, "enum": ["signup", "earn", "redeem", "tier_change"]},
+        "reward_id":    {"type": "integer", "nullable": true},
+        "store_id":     {"type": "integer", "nullable": true, "foreign_key": {"dataset": "stores", "column": "store_id"}}
+      },
+      "policies": [
+        {"kind": "required_if", "column": "reward_id", "when": {"column": "event_type", "equals": "redeem"}}
+      ],
+      "owners": {"source_owner": "loyalty-platform", "consumer_owner": "marketing-analytics"}
+    }
+  },
+  "freshness": {"max_snapshot_age_minutes": 60}
+}
