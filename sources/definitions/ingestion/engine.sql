@@ -1,15 +1,71 @@
 -- =============================================================================
--- Data Contract Ingestion Pattern — PROCESS_BATCH / RUN_PENDING
+-- Data Contract Ingestion Engine
+-- Database: NERO_DB  Schema: NERO_LOYALTY
 --
--- Simplified but functional reimplementation of the guide's contract-gate
--- procedures. Validation covers: manifest presence, declared vs actual row
--- counts + contiguous row numbers, required/nullable columns, enums,
--- integer/decimal/date parsing, string max length, in-batch foreign keys,
--- duplicate primary keys, and the reward_id-required-on-redeem policy.
--- Not implemented (flagged as scope-narrowing vs. the source guide):
--- string-length-by-byte edge cases, offset-bearing timestamp normalisation
--- beyond ISO parsing, and the file-content-key dedup check.
+-- Everything hand-written about the ingestion pipeline: control tables, the
+-- frozen-batch work table, the gate task, and PROCESS_BATCH/RUN_PENDING.
+-- RAW_ENVELOPES and VALIDATED_* are GENERATED from ingestion/contract.yaml —
+-- see raw.sql and validated.sql (run `python ingestion/build.py` to rebuild).
 -- =============================================================================
+
+-- =========================== CONTROL TABLES =================================
+
+DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS (
+    CONTRACT_ID    VARCHAR(200)   NOT NULL,
+    VERSION        NUMBER         NOT NULL,
+    CONTRACT_JSON  VARIANT        NOT NULL,
+    CONTRACT_HASH  VARCHAR(64)    NOT NULL,
+    LOADED_AT      TIMESTAMP_TZ   DEFAULT CURRENT_TIMESTAMP(),
+    PRIMARY KEY (CONTRACT_ID, VERSION)
+)
+COMMENT = 'Reviewed data contract documents, keyed by contract_id+version. CONTRACT_HASH is the SHA-256 of the exact contract bytes, pinned by PROCESS_BATCH at deploy time.';
+
+DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT (
+    BATCH_ID     VARCHAR(200)   NOT NULL,
+    RUN_ID       VARCHAR(200)   NOT NULL,
+    STATUS       VARCHAR(30)    NOT NULL,
+    DETAILS      VARIANT,
+    RECORDED_AT  TIMESTAMP_TZ   DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Audit trail of every PROCESS_BATCH invocation. STATUS one of: PUBLISHED, ALREADY_PUBLISHED, SUPERSEDED, REJECTED, INCOMPLETE, ERROR.';
+
+DEFINE TABLE NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER (
+    POINTER_NAME       VARCHAR(50)   NOT NULL,
+    CURRENT_BATCH_ID   VARCHAR(200),
+    CURRENT_RELEASE_AT TIMESTAMP_TZ,
+    UPDATED_AT         TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),
+    PRIMARY KEY (POINTER_NAME)
+)
+COMMENT = 'Compare-and-set pointer to the currently published batch. Reporting views join on this to expose only the approved release.';
+
+-- ============================ WORK TABLE ====================================
+
+DEFINE TABLE NERO_DB.NERO_LOYALTY.WORK_ENVELOPES (
+    RUN_ID       VARCHAR(200)  NOT NULL,
+    BATCH_ID     VARCHAR(200)  NOT NULL,
+    DOC          VARIANT       NOT NULL,
+    FROZEN_AT    TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Frozen snapshot of one batch''s raw envelopes for a single PROCESS_BATCH run. Written by one INSERT...SELECT so all downstream checks read the same fixed set. Cleared after normal runs.';
+
+-- ============================= GATE TASK ====================================
+-- Suspended by default (DCM default) — resume explicitly once smoke tests
+-- pass. Snowflake auto-suspends after 3 consecutive failures.
+
+DEFINE TASK NERO_DB.NERO_LOYALTY.CONTRACT_GATE_TASK
+    WAREHOUSE = 'COMPUTE_WH'
+    SCHEDULE = '15 MINUTE'
+    COMMENT = 'Calls RUN_PENDING to evaluate/publish outstanding manifested batches. Suspended until explicitly resumed post smoke-test.'
+AS
+    CALL NERO_DB.NERO_LOYALTY.RUN_PENDING();
+
+-- ============================= PROCEDURES ===================================
+-- Validation covers: manifest presence, declared vs actual row counts +
+-- contiguous row numbers, required/nullable columns, enums, integer/decimal/
+-- date parsing, string max length, in-batch foreign keys, duplicate primary
+-- keys, and the reward_id-required-on-redeem policy. Not implemented (scope
+-- narrowed vs. the source guide): string-length-by-byte edge cases, offset-
+-- bearing timestamp normalisation beyond ISO parsing, file-content-key dedup.
 
 DEFINE PROCEDURE NERO_DB.NERO_LOYALTY.PROCESS_BATCH(BATCH_ID VARCHAR)
 RETURNS VARIANT
@@ -30,7 +86,7 @@ POINTER_NAME = "LOYALTY_SNAPSHOT"
 
 
 def _validated_table(dataset_name: str) -> str:
-    # Naming convention, not a lookup table: tools/build.py generates
+    # Naming convention, not a lookup table: ingestion/build.py generates
     # VALIDATED_<DATASET> for every dataset in the contract, so adding a
     # dataset needs no change here — only the contract + a rebuild.
     return f"NERO_DB.NERO_LOYALTY.VALIDATED_{dataset_name.upper()}"
