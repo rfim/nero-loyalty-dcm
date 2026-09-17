@@ -2,6 +2,11 @@
 """Generates 3 synthetic batches (PUBLISHED, REJECTED, INCOMPLETE), uploads each
 to LANDING_STAGE, loads RAW_ENVELOPES, calls PROCESS_BATCH, and prints outcomes.
 
+The PUBLISHED (valid) batch is generated automatically from contracts/loyalty.yaml's
+per-column `example` values — adding a dataset to the contract automatically
+extends this scenario with no code change here. REJECTED/INCOMPLETE stay
+hand-crafted since they represent deliberately broken data.
+
 Scoped down from the source guide's 6-scenario suite to 3 representative
 outcomes. Fixtures are synthetic, not derived from the 90-day sample data.
 Usage: python tools/run_smoke_test.py -c <snow_connection_name>
@@ -15,8 +20,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-CONTRACT_PATH = Path(__file__).resolve().parent.parent / "contracts" / "loyalty.json"
-CONTRACT = json.loads(CONTRACT_PATH.read_text())
+import yaml
+
+CONTRACT_PATH = Path(__file__).resolve().parent.parent / "contracts" / "loyalty.yaml"
+CONTRACT = yaml.safe_load(CONTRACT_PATH.read_text())
 CONTRACT_HASH = hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest()
 
 
@@ -40,24 +47,29 @@ def record(batch_id, dataset, row_number, values):
 
 
 def build_valid_batch(batch_id, captured_at):
-    lines = [manifest(batch_id, {"stores": 1, "loyalty_customers": 1, "transactions": 1, "loyalty_events": 1}, captured_at)]
-    lines.append(record(batch_id, "stores", 1, {
-        "store_id": 1042, "store_name": "Manchester Deansgate", "region": "North West",
-        "format": "High street", "opened_date": "2019-03-11"}))
-    lines.append(record(batch_id, "loyalty_customers", 1, {
-        "customer_id": 55291, "signup_date": "2026-05-02", "tier": "Bronze", "home_store_id": 1042}))
-    lines.append(record(batch_id, "transactions", 1, {
-        "transaction_id": 8834021, "store_id": 1042, "transaction_ts": "2026-06-14T08:12:03+01:00",
-        "customer_id": 55291, "basket_total": "6.85", "item_count": 2, "payment_type": "Card"}))
-    lines.append(record(batch_id, "loyalty_events", 1, {
-        "event_id": 990233, "customer_id": 55291, "event_ts": "2026-05-20T09:41:10+01:00",
-        "event_type": "redeem", "reward_id": 204, "store_id": 1042}))
+    """One example row per dataset, values pulled straight from the contract's
+    `example` fields — adding a dataset to contracts/loyalty.yaml with examples
+    extends this scenario automatically, no edit needed here."""
+    dataset_counts = {name: 1 for name in CONTRACT["datasets"]}
+    lines = [manifest(batch_id, dataset_counts, captured_at)]
+    for ds_name, ds in CONTRACT["datasets"].items():
+        missing = [c for c, spec in ds["columns"].items() if "example" not in spec]
+        if missing:
+            sys.exit(f"run_smoke_test.py: dataset '{ds_name}' columns missing an "
+                      f"'example' value in the contract: {missing}")
+        values = {col: spec["example"] for col, spec in ds["columns"].items()}
+        lines.append(record(batch_id, ds_name, 1, values))
     return lines
 
 
+def _zero_counts_except(dataset, count):
+    return {name: (count if name == dataset else 0) for name in CONTRACT["datasets"]}
+
+
 def build_rejected_batch(batch_id, captured_at):
-    """Duplicate primary key in stores -> REJECTED."""
-    lines = [manifest(batch_id, {"stores": 2, "loyalty_customers": 0, "transactions": 0, "loyalty_events": 0}, captured_at)]
+    """Duplicate primary key in stores -> REJECTED. Deliberately broken data,
+    so hand-crafted rather than derived from contract examples."""
+    lines = [manifest(batch_id, _zero_counts_except("stores", 2), captured_at)]
     for row_number in (1, 2):
         lines.append(record(batch_id, "stores", row_number, {
             "store_id": 1042, "store_name": "Manchester Deansgate", "region": "North West",
@@ -67,7 +79,7 @@ def build_rejected_batch(batch_id, captured_at):
 
 def build_incomplete_batch(batch_id, captured_at):
     """Manifest declares 2 store rows, only 1 delivered -> INCOMPLETE."""
-    lines = [manifest(batch_id, {"stores": 2, "loyalty_customers": 0, "transactions": 0, "loyalty_events": 0}, captured_at)]
+    lines = [manifest(batch_id, _zero_counts_except("stores", 2), captured_at)]
     lines.append(record(batch_id, "stores", 1, {
         "store_id": 1043, "store_name": "Leeds Briggate", "region": "Yorkshire",
         "format": "High street", "opened_date": "2020-01-15"}))
