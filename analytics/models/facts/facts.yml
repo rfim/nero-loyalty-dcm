@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: fact_sales_transaction
+    description: >
+      Grain: one row per transaction_id. Do not join directly to
+      fact_loyalty_event — aggregate each fact to a compatible grain first.
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: transaction_date_key
+        tests: [not_null]
+      - name: store_key
+        tests: [not_null]
+      - name: customer_key
+        tests: [not_null]
+
+  - name: fact_loyalty_event
+    description: "Grain: one row per event_id."
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: event_date_key
+        tests: [not_null]
+      - name: customer_key
+        tests: [not_null]
+      - name: reward_key
+        tests: [not_null]
