@@ -98,6 +98,19 @@ def load_cost_data():
     ]
     cortex_credits_lifetime = sum(c["credits"] for c in cortex_by_source)
 
+    warehouse_user_rows = rows(f"""
+        SELECT WAREHOUSE_NAME, USER_NAME, SUM(QUERY_COUNT) AS Q, SUM(CREDITS_ATTRIBUTED) AS C
+        FROM {GOV}.COST.WAREHOUSE_USER_CREDITS_DAILY
+        WHERE USAGE_DATE >= DATEADD('day', -30, CURRENT_DATE())
+        GROUP BY WAREHOUSE_NAME, USER_NAME
+        ORDER BY C DESC
+    """)
+    warehouse_user_costs = [
+        {"warehouse": r["WAREHOUSE_NAME"], "user": r["USER_NAME"], "query_count": int(r["Q"] or 0),
+         "credits": float(r["C"] or 0)}
+        for r in warehouse_user_rows
+    ]
+
     period_start = one(f"SELECT MIN(USAGE_DATE) AS D FROM {GOV}.COST.WAREHOUSE_CREDITS_DAILY")["D"]
     period_end = one(f"SELECT MAX(USAGE_DATE) AS D FROM {GOV}.COST.WAREHOUSE_CREDITS_DAILY")["D"]
 
@@ -119,6 +132,7 @@ def load_cost_data():
             "cortex_by_source": cortex_by_source,
             "cortex_credits_lifetime": cortex_credits_lifetime,
             "cortex_usd_lifetime": cortex_credits_lifetime * credit_rate,
+            "warehouse_user_costs": warehouse_user_costs,
         },
     }
 
@@ -137,6 +151,7 @@ def build_cost_pdf(d: dict) -> bytes:
     budget_rows = [[w["name"], w["workload"], f"{w['quota']:.2f}", f"{w['used']:.3f}", f"{w['pct']:.1f}%"] for w in c["warehouses"]]
     role_rows = [[r["warehouse"], r["role"], f"{r['query_count']:,}", f"{r['execution_hours']:.2f}", f"{r['cloud_services_credits']:.3f}"] for r in c["role_attribution"]] or [["—", "No query activity in the last 30 days", "", "", ""]]
     cortex_rows = [[r["source"], f"{r['credits']:.3f}", f"{r['tokens']:,}", f"{r['requests']:,}"] for r in c["cortex_by_source"]] or [["—", "No Cortex usage recorded", "", ""]]
+    wu_rows = [[r["warehouse"], r["user"], f"{r['query_count']:,}", f"{r['credits']:.3f}"] for r in c["warehouse_user_costs"]] or [["—", "No data yet — QUERY_ATTRIBUTION_HISTORY lags up to ~24h", "", ""]]
 
     sections = [
         ("Executive Summary", [
@@ -165,6 +180,17 @@ def build_cost_pdf(d: dict) -> bytes:
             rc.styled_table(["Source", "Credits", "Tokens", "Requests"], cortex_rows,
                              col_widths=[160, 90, 90, 90]),
         ]),
+        ("4. Cost per Warehouse per User, Last 30 Days", [
+            rc.styled_table(["Warehouse", "User", "Queries", "Credits Attributed"], wu_rows,
+                             col_widths=[100, 130, 80, 110]),
+            rc.caption(
+                "Real per-query credit attribution from SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY "
+                "(CREDITS_ATTRIBUTED_COMPUTE) — not an execution-time proxy. This view characteristically "
+                "lags up to ~24 hours, longer than other ACCOUNT_USAGE views; each of the four workloads "
+                "(NERO_INGEST_USER, NERO_CI_USER, NERO_BI_USER, NERO_DBT_USER) now has its own login, so "
+                "once the lag clears this table attributes spend to an actual identity per warehouse."
+            ),
+        ]),
     ]
     return rc.build_pdf(
         report_title="Cost Governance Report",
@@ -186,6 +212,8 @@ def build_cost_excel(d: dict) -> bytes:
         "Daily Credits": pd.DataFrame([
             {"Date": row["date"], **row["credits"]} for row in c["daily_by_warehouse"]
         ]) if c["daily_by_warehouse"] else pd.DataFrame([{"Date": None}]),
+        "Cost by Warehouse & User": pd.DataFrame(c["warehouse_user_costs"] or [{"warehouse": "", "user": "", "query_count": 0, "credits": 0}])
+            .rename(columns={"warehouse": "Warehouse", "user": "User", "query_count": "Queries", "credits": "Credits Attributed"}),
     }
     return rc.write_excel_workbook(
         title="Cost Governance Report",

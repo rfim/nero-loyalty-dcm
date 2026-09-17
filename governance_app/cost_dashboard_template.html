@@ -162,6 +162,13 @@
     <div class="tbl-wrap"><table class="datatable" id="cortexTable"></table></div>
   </section>
 
+  <section class="doc-section">
+    <span class="section-num">4.</span><span class="section-title">Cost per warehouse per user</span>
+    <p class="section-sub">Real per-query credit attribution (SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY), last 30 days — each workload now runs under its own service user rather than a shared login.</p>
+    <div class="tbl-wrap"><table class="datatable" id="warehouseUserTable"></table></div>
+    <div class="note-block" id="warehouseUserNote"></div>
+  </section>
+
   <footer>
     <p>Sources: SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY, .QUERY_HISTORY, .CORTEX_*_USAGE_HISTORY, SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY, wrapped by NERO_GOVERNANCE.COST. ACCOUNT_USAGE carries replication latency of up to a few hours.</p>
   </footer>
@@ -301,6 +308,21 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.
   } else {
     ct.innerHTML = `<thead><tr><th>Source</th><th>Credits</th><th>Tokens</th><th>Requests</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
+  }
+})();
+
+(function () {
+  const wt = document.getElementById('warehouseUserTable');
+  const rows = DATA.cost.warehouse_user_costs;
+  if (rows.length === 0) {
+    wt.innerHTML = `<tbody><tr><td style="color:var(--ink-muted)">No data yet.</td></tr></tbody>`;
+    document.getElementById('warehouseUserNote').innerHTML =
+      `<b>QUERY_ATTRIBUTION_HISTORY lags the other ACCOUNT_USAGE views</b> — often by many hours. The four service users (NERO_INGEST_USER, NERO_CI_USER, NERO_BI_USER, NERO_DBT_USER) were only created today, so this table is expected to be empty until Snowflake's own scanner catches up. Check back later.`;
+  } else {
+    wt.innerHTML = `<thead><tr><th>Warehouse</th><th>User</th><th>Queries</th><th>Credits attributed</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.warehouse}</td><td>${r.user}</td><td>${fmtInt(r.query_count)}</td><td>${fmtCredits(r.credits)}</td></tr>`).join('')}</tbody>`;
+    document.getElementById('warehouseUserNote').innerHTML =
+      `Real per-query credit attribution (CREDITS_ATTRIBUTED_COMPUTE), not an execution-time proxy.`;
   }
 })();
 

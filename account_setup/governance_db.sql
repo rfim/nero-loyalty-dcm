@@ -110,6 +110,21 @@ GROUP BY WAREHOUSE_NAME, ROLE_NAME, QUERY_DATE;
 COMMENT ON VIEW COST.QUERY_COST_BY_ROLE_DAILY IS
   'Query volume and execution time by role, per warehouse per day — the attribution granularity warehouse-level cost alone cannot give. Today this will mostly show ACCOUNTADMIN, since ingestion/CI don''t yet run under dedicated roles (see repo follow-up).';
 
+CREATE OR REPLACE VIEW COST.WAREHOUSE_USER_CREDITS_DAILY AS
+SELECT
+    WAREHOUSE_NAME,
+    USER_NAME,
+    DATE_TRUNC('day', START_TIME) AS USAGE_DATE,
+    COUNT(*) AS QUERY_COUNT,
+    SUM(CREDITS_ATTRIBUTED_COMPUTE) AS CREDITS_ATTRIBUTED,
+    SUM(CREDITS_USED_QUERY_ACCELERATION) AS CREDITS_QUERY_ACCELERATION
+FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY
+WHERE WAREHOUSE_NAME LIKE 'NERO\_%' ESCAPE '\\'
+GROUP BY WAREHOUSE_NAME, USER_NAME, USAGE_DATE;
+
+COMMENT ON VIEW COST.WAREHOUSE_USER_CREDITS_DAILY IS
+  'Real per-query credit attribution (SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY.CREDITS_ATTRIBUTED_COMPUTE), grouped by warehouse, user and day — the actual cost-per-warehouse-per-user answer, not an execution-time proxy like QUERY_COST_BY_ROLE_DAILY. This view characteristically lags other ACCOUNT_USAGE views by up to ~24h. Meaningful now that each workload (account_setup/service_users.sql) has its own login instead of sharing ACCOUNTADMIN.';
+
 -- =============================== SECURITY ====================================
 
 CREATE OR REPLACE VIEW SECURITY.LOGIN_HISTORY_RECENT AS
