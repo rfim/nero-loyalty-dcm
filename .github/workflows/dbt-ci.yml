@@ -42,7 +42,7 @@ jobs:
                 authenticator: snowflake_jwt
                 private_key_path: /home/runner/.snowflake/keys/rsa_key.p8
                 database: NERO_ANALYTICS
-                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                warehouse: NERO_DBT_WH
                 schema: DBT_CI_${{ github.event.pull_request.number }}
                 threads: 4
           EOF

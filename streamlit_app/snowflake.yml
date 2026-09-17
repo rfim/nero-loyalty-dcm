@@ -7,7 +7,7 @@ entities:
       schema: NERO_LOYALTY
       database: NERO_DB
     stage: streamlit_stage
-    query_warehouse: COMPUTE_WH
+    query_warehouse: NERO_BI_WH
     main_file: loyalty_trading_pulse.py
     artifacts:
       - loyalty_trading_pulse.py

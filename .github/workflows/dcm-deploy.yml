@@ -30,7 +30,7 @@ jobs:
             --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
             --user "${{ secrets.SNOWFLAKE_USER }}" \
             --role "${{ secrets.SNOWFLAKE_ROLE }}" \
-            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            --warehouse "NERO_CI_WH" \
             --database "${{ secrets.SNOWFLAKE_DATABASE }}" \
             --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
             --authenticator SNOWFLAKE_JWT \
@@ -70,7 +70,7 @@ jobs:
                 authenticator: snowflake_jwt
                 private_key_path: /home/runner/.snowflake/keys/rsa_key.p8
                 database: NERO_ANALYTICS
-                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                warehouse: NERO_DBT_WH
                 schema: gold
                 threads: 4
           EOF
@@ -88,14 +88,5 @@ jobs:
         run: dbt build --target prod
 
       - name: Deploy Streamlit app
-        run: |
-          snow stage create NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE -c ci || true
-          snow stage copy streamlit_app/streamlit_app.py @NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE \
-            --overwrite -c ci
-          snow sql -c ci -q "
-            CREATE OR REPLACE STREAMLIT NERO_DB.NERO_LOYALTY.NERO_LOYALTY_DASHBOARD
-              ROOT_LOCATION = '@NERO_DB.NERO_LOYALTY.STREAMLIT_STAGE'
-              MAIN_FILE = 'streamlit_app.py'
-              QUERY_WAREHOUSE = 'COMPUTE_WH'
-              COMMENT = 'Loyalty/sales overview dashboard, deployed by CI.'
-          "
+        working-directory: streamlit_app
+        run: snow streamlit deploy nero_loyalty_pulse --replace --prune -c ci

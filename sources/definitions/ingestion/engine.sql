@@ -53,7 +53,7 @@ COMMENT = 'Frozen snapshot of one batch''s raw envelopes for a single PROCESS_BA
 -- pass. Snowflake auto-suspends after 3 consecutive failures.
 
 DEFINE TASK NERO_DB."02_CONTROL".CONTRACT_GATE_TASK
-    WAREHOUSE = 'COMPUTE_WH'
+    WAREHOUSE = 'NERO_LOAD_WH'
     SCHEDULE = '15 MINUTE'
     COMMENT = 'Calls RUN_PENDING to evaluate/publish outstanding manifested batches. Suspended until explicitly resumed post smoke-test.'
 AS
