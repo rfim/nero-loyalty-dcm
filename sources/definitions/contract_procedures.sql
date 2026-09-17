@@ -39,8 +39,9 @@ DATASET_TABLES = {
 def _audit(session, batch_id, run_id, status, details):
     session.sql(
         "INSERT INTO NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT "
-        "(BATCH_ID, RUN_ID, STATUS, DETAILS) SELECT ?, ?, ?, PARSE_JSON(?)"
-    ).bind([batch_id, run_id, status, json.dumps(details, default=str)]).collect()
+        "(BATCH_ID, RUN_ID, STATUS, DETAILS) SELECT ?, ?, ?, PARSE_JSON(?)",
+        params=[batch_id, run_id, status, json.dumps(details, default=str)],
+    ).collect()
     return {"batch_id": batch_id, "run_id": run_id, "status": status, "details": details}
 
 
@@ -65,8 +66,9 @@ def run(session, batch_id: str) -> dict:
     # Idempotent replay: already-terminal batches are not reprocessed.
     existing = session.sql(
         "SELECT STATUS FROM NERO_DB.NERO_LOYALTY.CONTROL_RUN_AUDIT "
-        "WHERE BATCH_ID = ? AND STATUS = 'PUBLISHED' LIMIT 1"
-    ).bind([batch_id]).collect()
+        "WHERE BATCH_ID = ? AND STATUS = 'PUBLISHED' LIMIT 1",
+        params=[batch_id],
+    ).collect()
     if existing:
         return {"batch_id": batch_id, "run_id": None, "status": "ALREADY_PUBLISHED", "details": {}}
 
@@ -77,12 +79,14 @@ def run(session, batch_id: str) -> dict:
         "INSERT INTO NERO_DB.NERO_LOYALTY.WORK_ENVELOPES (RUN_ID, BATCH_ID, DOC) "
         "SELECT DISTINCT ?, ?, PARSE_JSON(PAYLOAD) "
         "FROM NERO_DB.NERO_LOYALTY.RAW_ENVELOPES "
-        "WHERE PARSE_JSON(PAYLOAD):batch_id::string = ?"
-    ).bind([run_id, batch_id, batch_id]).collect()
+        "WHERE PARSE_JSON(PAYLOAD):batch_id::string = ?",
+        params=[run_id, batch_id, batch_id],
+    ).collect()
 
     rows = session.sql(
-        "SELECT DOC FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?"
-    ).bind([run_id]).collect()
+        "SELECT DOC FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?",
+        params=[run_id],
+    ).collect()
     docs = [json.loads(r["DOC"]) if isinstance(r["DOC"], str) else r["DOC"] for r in rows]
 
     manifests = [d for d in docs if d.get("type") == "manifest"]
@@ -99,8 +103,9 @@ def run(session, batch_id: str) -> dict:
 
     pinned = session.sql(
         "SELECT CONTRACT_HASH, CONTRACT_JSON FROM NERO_DB.NERO_LOYALTY.CONTROL_DATA_CONTRACTS "
-        "WHERE CONTRACT_ID = ? AND VERSION = ?"
-    ).bind([CONTRACT_ID, CONTRACT_VERSION]).collect()
+        "WHERE CONTRACT_ID = ? AND VERSION = ?",
+        params=[CONTRACT_ID, CONTRACT_VERSION],
+    ).collect()
     if not pinned:
         return _audit(session, batch_id, run_id, "ERROR", {"reason": "pinned contract not seeded in CONTROL_DATA_CONTRACTS"})
     if manifest.get("contract_hash") != pinned[0]["CONTRACT_HASH"]:
@@ -215,8 +220,9 @@ def run(session, batch_id: str) -> dict:
     # Publication gate: compare-and-set against the release pointer.
     captured_at = manifest.get("captured_at")
     pointer = session.sql(
-        "SELECT CURRENT_RELEASE_AT FROM NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER WHERE POINTER_NAME = ?"
-    ).bind([POINTER_NAME]).collect()
+        "SELECT CURRENT_RELEASE_AT FROM NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER WHERE POINTER_NAME = ?",
+        params=[POINTER_NAME],
+    ).collect()
     current_release_at = pointer[0]["CURRENT_RELEASE_AT"] if pointer else None
     if current_release_at is not None and str(current_release_at) >= str(captured_at):
         return _audit(session, batch_id, run_id, "SUPERSEDED",
@@ -231,16 +237,19 @@ def run(session, batch_id: str) -> dict:
                 [tuple(list(r[c] for c in cols) + [batch_id]) for r in validated_rows[ds]],
                 schema=[c.upper() for c in cols] + ["BATCH_ID"],
             )
-            df.write.save_as_table(table, mode="append")
+            df.write.save_as_table(table, mode="append", column_order="name")
 
     session.sql(
         "MERGE INTO NERO_DB.NERO_LOYALTY.CONTROL_RELEASE_POINTER t "
         "USING (SELECT ? AS POINTER_NAME) s ON t.POINTER_NAME = s.POINTER_NAME "
         "WHEN MATCHED THEN UPDATE SET CURRENT_BATCH_ID = ?, CURRENT_RELEASE_AT = ?, UPDATED_AT = CURRENT_TIMESTAMP() "
-        "WHEN NOT MATCHED THEN INSERT (POINTER_NAME, CURRENT_BATCH_ID, CURRENT_RELEASE_AT) VALUES (?, ?, ?)"
-    ).bind([POINTER_NAME, batch_id, captured_at, POINTER_NAME, batch_id, captured_at]).collect()
+        "WHEN NOT MATCHED THEN INSERT (POINTER_NAME, CURRENT_BATCH_ID, CURRENT_RELEASE_AT) VALUES (?, ?, ?)",
+        params=[POINTER_NAME, batch_id, captured_at, POINTER_NAME, batch_id, captured_at],
+    ).collect()
 
-    session.sql("DELETE FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?").bind([run_id]).collect()
+    session.sql(
+        "DELETE FROM NERO_DB.NERO_LOYALTY.WORK_ENVELOPES WHERE RUN_ID = ?", params=[run_id]
+    ).collect()
 
     return _audit(session, batch_id, run_id, "PUBLISHED",
                    {ds: len(rows_) for ds, rows_ in validated_rows.items()})
@@ -255,6 +264,9 @@ HANDLER = 'run'
 COMMENT = 'Evaluates up to 10 outstanding manifested batches; publishes at most one per invocation. Raises on the first REJECTED batch so the calling task run fails.'
 AS
 $$
+import json
+
+
 def run(session) -> dict:
     pending = session.sql(
         "SELECT DISTINCT PARSE_JSON(PAYLOAD):batch_id::string AS BATCH_ID "
@@ -272,6 +284,8 @@ def run(session) -> dict:
     for row in pending:
         batch_id = row["BATCH_ID"]
         result = session.call("NERO_DB.NERO_LOYALTY.PROCESS_BATCH", batch_id)
+        if isinstance(result, str):
+            result = json.loads(result)
         status = result["status"] if isinstance(result, dict) else None
         if status == "PUBLISHED":
             return result
