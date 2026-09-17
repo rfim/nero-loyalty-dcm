@@ -88,4 +88,4 @@ DEFINE TABLE NERO_DB.NERO_LOYALTY.DIM_REWARD (
     REWARD_TYPE        VARCHAR(100),
     POINTS_REQUIRED    NUMBER
 )
-COMMENT = 'Reward dimension (placeholder — no source table given). Grain: one row per reward_id. Populate when reward catalog becomes available.';
+COMMENT = 'This is Tweak Reward dimension (placeholder — no source table given). Grain: one row per reward_id. Populate when reward catalog becomes available.';
