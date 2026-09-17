@@ -81,7 +81,7 @@ import uuid
 from datetime import datetime, date
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 2
+CONTRACT_VERSION = 3
 POINTER_NAME = "LOYALTY_SNAPSHOT"
 
 

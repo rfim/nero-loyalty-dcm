@@ -1,0 +1,13 @@
+primary_key: [event_id]
+owners: {source_owner: loyalty-platform, consumer_owner: marketing-analytics}
+columns:
+  event_id:    {type: integer,      nullable: false, example: 990233}
+  customer_id: {type: integer,      nullable: false, pii: true, pii_kind: identifier, foreign_key: {dataset: loyalty_customers, column: customer_id}, example: 55291}
+  event_ts:    {type: timestamp_tz, nullable: false, example: "2026-05-20T09:41:10+01:00"}
+  event_type:  {type: string,       nullable: false, enum: [signup, earn, redeem, tier_change], example: "redeem"}
+  reward_id:   {type: integer,      nullable: true, example: 204}
+  store_id:    {type: integer,      nullable: true, foreign_key: {dataset: stores, column: store_id}, example: 1042}
+policies:
+  - kind: required_if
+    column: reward_id
+    when: {column: event_type, equals: redeem}

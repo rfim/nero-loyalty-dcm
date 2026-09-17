@@ -1,0 +1,10 @@
+primary_key: [transaction_id]
+owners: {source_owner: pos-platform, consumer_owner: store-operations}
+columns:
+  transaction_id: {type: integer,     nullable: false, example: 8834021}
+  store_id:       {type: integer,     nullable: false, foreign_key: {dataset: stores, column: store_id}, example: 1042}
+  transaction_ts: {type: timestamp_tz, nullable: false, example: "2026-06-14T08:12:03+01:00"}
+  customer_id:    {type: integer,     nullable: true, pii: true, pii_kind: identifier, foreign_key: {dataset: loyalty_customers, column: customer_id}, example: 55291}
+  basket_total:   {type: decimal,     nullable: false, precision: 8, scale: 2, example: "6.85"}
+  item_count:     {type: integer,     nullable: false, example: 2}
+  payment_type:   {type: string,      nullable: false, enum: [Card, App, Cash], example: "Card"}
