@@ -30,7 +30,7 @@ jobs:
             --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
             --user "${{ secrets.SNOWFLAKE_USER }}" \
             --role "${{ secrets.SNOWFLAKE_ROLE }}" \
-            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            --warehouse "NERO_CI_WH" \
             --database "${{ secrets.SNOWFLAKE_DATABASE }}" \
             --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
             --authenticator SNOWFLAKE_JWT \
