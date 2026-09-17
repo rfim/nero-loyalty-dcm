@@ -1,0 +1,31 @@
+# Template only — copy to ~/.dbt/profiles.yml and fill in your own values.
+# Never commit a populated profiles.yml. CI supplies these via GitHub Actions
+# secrets (see .github/workflows/dbt-ci.yml), reusing the same key-pair
+# credential already set up for the DCM pipeline — just with role=NERO_DBT_ROLE
+# instead of ACCOUNTADMIN, so dbt can never write to DCM-managed objects.
+nero_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: NERO_DBT_ROLE
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      database: NERO_ANALYTICS
+      warehouse: COMPUTE_WH
+      schema: dbt_dev
+      threads: 4
+
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: NERO_DBT_ROLE
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      database: NERO_ANALYTICS
+      warehouse: COMPUTE_WH
+      schema: gold
+      threads: 4

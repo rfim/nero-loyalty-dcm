@@ -1,0 +1,68 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ["analytics/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analytics
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install "dbt-snowflake~=1.11.0"
+
+      - name: Configure profiles.yml
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.dbt
+          mkdir -p ~/.snowflake/keys
+          echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/keys/rsa_key.p8
+          chmod 600 ~/.snowflake/keys/rsa_key.p8
+          cat > ~/.dbt/profiles.yml <<EOF
+          nero_analytics:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+                user: ${{ secrets.SNOWFLAKE_USER }}
+                role: NERO_DBT_ROLE
+                authenticator: snowflake_jwt
+                private_key_path: /home/runner/.snowflake/keys/rsa_key.p8
+                database: NERO_ANALYTICS
+                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                schema: DBT_CI_${{ github.event.pull_request.number }}
+                threads: 4
+          EOF
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt debug
+        run: dbt debug
+
+      - name: dbt parse
+        run: dbt parse
+
+      - name: dbt compile
+        run: dbt compile
+
+      - name: dbt build (isolated CI schema)
+        run: dbt build
+
+      - name: Clean up CI schema
+        if: always()
+        run: |
+          dbt run-operation drop_schema_if_exists --args '{schema_name: DBT_CI_${{ github.event.pull_request.number }}}' || true
