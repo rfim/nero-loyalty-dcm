@@ -1,0 +1,308 @@
+<!doctype html>
+<title>Cost Governance Report</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper:          #ffffff;
+    --paper-band:     #f5f6f8;
+    --ink:            #1c2b3a;
+    --ink-secondary:  #4c5c6b;
+    --ink-muted:      #8a97a3;
+    --rule:           #d7dde2;
+    --rule-strong:    #b7c1ca;
+    --accent:         #3d5a73;
+    --accent-wash:    #eaeff3;
+    --status-good:    #0ca30c;
+    --status-warn:    #b8860b;
+    --status-serious: #c56a3e;
+    --status-crit:    #b23a3a;
+    --series-1:       #3d5a73;
+    --series-2:       #7c8f9e;
+    --series-3:       #a8bcc9;
+    --series-4:       #c9754a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+      --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+      --accent: #8fa9bd; --accent-wash: #202a32;
+      --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+      --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66; --series-4: #d99567;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+    --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+    --accent: #8fa9bd; --accent-wash: #202a32;
+    --status-good: #3fbf3f; --status-warn: #d9a441; --status-serious: #dd8c67; --status-crit: #d96b6b;
+    --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66; --series-4: #d99567;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--paper-band); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55;
+  }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1040px; margin: 0 auto; padding: 0 20px 56px; }
+
+  .titleblock {
+    background: var(--paper); border-bottom: 3px solid var(--accent);
+    padding: 34px 36px 24px; margin-top: 18px;
+  }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 21px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  .kpi.flag .value { color: var(--status-crit); }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 30px; margin-top: 18px; align-items: start; }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+  .panel-title { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 11.5px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 11.5px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar-track { fill: var(--accent-wash); }
+  .axis-line { stroke: var(--rule-strong); stroke-width: 1; }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered, .seg.hovered { filter: brightness(1.1); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100; background: var(--paper); border: 1px solid var(--rule-strong);
+    padding: 8px 11px; font-size: 11.5px; box-shadow: 0 6px 18px rgba(20,25,30,0.16); color: var(--ink); max-width: 230px;
+    transform: translate(-50%, -100%); opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 700; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-secondary); margin-bottom: 10px; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 9px; height: 9px; display: inline-block; }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  .tbl-wrap { overflow-x: auto; }
+
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block b { color: var(--ink); }
+
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <div class="kicker">Nero Platform &middot; Governance Series</div>
+    <h1>Cost Governance Report</h1>
+    <p class="sub">Warehouse and Cortex compute spend against budget, by workload — read directly from NERO_GOVERNANCE.COST, which itself reads SNOWFLAKE.ACCOUNT_USAGE.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Report period</div><div class="v" id="metaPeriod"></div></div>
+      <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
+      <div class="meta-item"><div class="k">Credit rate</div><div class="v" id="metaRate"></div></div>
+      <div class="meta-item"><div class="k">Warehouses monitored</div><div class="v" id="metaCount"></div></div>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section">
+    <span class="section-num">1.</span><span class="section-title">Budget vs. actual, month to date</span>
+    <p class="section-sub">Each NERO_*_WH sits behind its own resource monitor (account_setup/warehouses_and_monitors.sql). Bars are shaded by proximity to quota, not by warehouse identity.</p>
+    <div class="grid-2">
+      <div>
+        <div class="panel-title">% of monthly quota consumed</div>
+        <svg id="chartBudget" class="barchart"></svg>
+      </div>
+      <div>
+        <div class="panel-title">Daily credit burn, last 7 days (stacked by warehouse)</div>
+        <svg id="chartDaily" class="barchart"></svg>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table class="datatable" id="budgetTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">2.</span><span class="section-title">Cost attribution by role</span>
+    <p class="section-sub">Query volume and execution time by role, per warehouse, last 30 days — the granularity a warehouse total alone can't give.</p>
+    <div class="tbl-wrap"><table class="datatable" id="roleTable"></table></div>
+    <div class="note-block" id="roleNote"></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">3.</span><span class="section-title">Serverless (Cortex) usage</span>
+    <p class="section-sub">Cortex Code CLI, LLM functions, Analyst and Search — billed separately from warehouse compute.</p>
+    <div class="tbl-wrap"><table class="datatable" id="cortexTable"></table></div>
+  </section>
+
+  <footer>
+    <p>Sources: SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY, .QUERY_HISTORY, .CORTEX_*_USAGE_HISTORY, SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY, wrapped by NERO_GOVERNANCE.COST. ACCOUNT_USAGE carries replication latency of up to a few hours.</p>
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add('show'); positionTip(evt); }
+function positionTip(evt) { tooltip.style.left = evt.clientX + 'px'; tooltip.style.top = (evt.clientY - 14) + 'px'; }
+function hideTip() { tooltip.classList.remove('show'); }
+const fmtPct = (v) => v == null ? '—' : v.toFixed(1) + '%';
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtCredits = (v) => v == null ? '—' : v.toFixed(3);
+const fmtUsd = (v) => v == null ? '—' : '$' + v.toFixed(2);
+const fmtHrs = (v) => v == null ? '—' : v.toFixed(2);
+const fmtDate = (s) => s == null ? '—' : new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, maxOverride, tipRows, height }) {
+  const n = rows.length, rowH = height || 30, labelW = 128, valueW = 56, chartW = 380;
+  const totalW = labelW + chartW + valueW, totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  const max = maxOverride || Math.max(...rows.map(valueFn), 0.0001) * 1.08;
+  svgEl.innerHTML = '';
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4, v = valueFn(row), w = Math.max((v / max) * chartW, 2);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8); label.setAttribute('y', y + rowH / 2 - 4); label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = labelFn(row); svgEl.appendChild(label);
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW); track.setAttribute('y', y); track.setAttribute('width', chartW); track.setAttribute('height', rowH - 10);
+    track.setAttribute('class', 'bar-track'); svgEl.appendChild(track);
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW); fill.setAttribute('y', y); fill.setAttribute('width', w); fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('fill', typeof color === 'function' ? color(row) : color); fill.setAttribute('class', 'bar-fill'); svgEl.appendChild(fill);
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10); vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label'); vLabel.textContent = fmtFn(v); svgEl.appendChild(vLabel);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2); hit.setAttribute('width', totalW); hit.setAttribute('height', rowH); hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, tipRows(row)); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+function renderStackedBarChart(svgEl, groups, seriesKeys, seriesColors, { tipRows }) {
+  const n = groups.length, chartH = 200, axisW = 40, topPad = 10, botPad = 24, gap = 10, barW = 34;
+  const totalH = chartH + topPad + botPad, totalW = axisW + n * (barW + gap) + gap;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  svgEl.innerHTML = '';
+  const max = Math.max(...groups.map(g => seriesKeys.reduce((s, k) => s + (g[k] || 0), 0)), 0.0001) * 1.15;
+  const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  axis.setAttribute('x1', axisW); axis.setAttribute('x2', axisW); axis.setAttribute('y1', topPad); axis.setAttribute('y2', topPad + chartH);
+  axis.setAttribute('class', 'axis-line'); svgEl.appendChild(axis);
+  groups.forEach((g, gi) => {
+    const x = axisW + gap + gi * (barW + gap);
+    let yCursor = topPad + chartH;
+    seriesKeys.forEach((k) => {
+      const v = g[k] || 0; if (v <= 0) return;
+      const h = Math.max((v / max) * chartH - 2, 0); yCursor -= (h + 2);
+      const seg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      seg.setAttribute('x', x); seg.setAttribute('y', yCursor); seg.setAttribute('width', barW); seg.setAttribute('height', h);
+      seg.setAttribute('fill', seriesColors[k]); seg.setAttribute('class', 'seg');
+      seg.addEventListener('mousemove', (e) => { seg.classList.add('hovered'); showTip(e, tipRows(g, k)); });
+      seg.addEventListener('mouseleave', () => { seg.classList.remove('hovered'); hideTip(); });
+      svgEl.appendChild(seg);
+    });
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', x + barW / 2); label.setAttribute('y', topPad + chartH + 16); label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = g.label; svgEl.appendChild(label);
+  });
+}
+
+document.getElementById('metaPeriod').textContent = `${fmtDate(DATA.period_start)} – ${fmtDate(DATA.period_end)}`;
+document.getElementById('metaGenerated').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+document.getElementById('metaRate').textContent = `$${DATA.cost.credit_rate.toFixed(2)} / credit`;
+document.getElementById('metaCount').textContent = DATA.cost.warehouses.length;
+
+const kpis = [
+  { label: 'Lifetime spend', value: fmtUsd(DATA.cost.total_usd_lifetime), note: `${fmtCredits(DATA.cost.total_credits_lifetime)} credits` },
+  { label: 'Month-to-date spend', value: fmtUsd(DATA.cost.mtd_usd), note: `${fmtCredits(DATA.cost.mtd_credits)} credits` },
+  { label: 'Projected month-end', value: fmtUsd(DATA.cost.forecast_usd), note: 'linear from days elapsed' },
+  { label: 'Highest budget usage', value: fmtPct(DATA.cost.max_pct_warehouse ? DATA.cost.max_pct_warehouse.pct : 0), note: DATA.cost.max_pct_warehouse ? DATA.cost.max_pct_warehouse.name : '—', flag: DATA.cost.max_pct_warehouse && DATA.cost.max_pct_warehouse.pct >= 75 },
+  { label: 'Cortex spend, lifetime', value: fmtUsd(DATA.cost.cortex_usd_lifetime), note: `${fmtCredits(DATA.cost.cortex_credits_lifetime)} credits` },
+];
+document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.flag ? ' flag' : ''}"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+
+(function () {
+  const good = getComputedStyle(document.documentElement).getPropertyValue('--status-good').trim();
+  const warn = getComputedStyle(document.documentElement).getPropertyValue('--status-warn').trim();
+  const serious = getComputedStyle(document.documentElement).getPropertyValue('--status-serious').trim();
+  const crit = getComputedStyle(document.documentElement).getPropertyValue('--status-crit').trim();
+  const pctColor = (pct) => pct >= 100 ? crit : pct >= 75 ? serious : pct >= 50 ? warn : good;
+
+  const budgetSorted = [...DATA.cost.warehouses].sort((a, b) => b.pct - a.pct);
+  renderBarChart(document.getElementById('chartBudget'), budgetSorted, {
+    valueFn: r => r.pct, labelFn: r => r.name, fmtFn: v => v.toFixed(1) + '%', color: r => pctColor(r.pct), maxOverride: 100,
+    tipRows: r => `<div class="t-title">${r.name}</div><div class="t-row"><span>Workload</span><b>${r.workload}</b></div><div class="t-row"><span>Used / Quota</span><b>${fmtCredits(r.used)} / ${fmtCredits(r.quota)} cr</b></div>`,
+  });
+
+  const seriesKeys = DATA.cost.warehouses.map(w => w.name);
+  const palette = ['--series-1', '--series-2', '--series-3', '--series-4'].map(v => getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+  const seriesColors = {}; seriesKeys.forEach((k, i) => seriesColors[k] = palette[i % palette.length]);
+  const groups = DATA.cost.daily_by_warehouse.map(d => ({ label: fmtDate(d.date), date: d.date, ...d.credits }));
+  renderStackedBarChart(document.getElementById('chartDaily'), groups, seriesKeys, seriesColors, {
+    tipRows: (g, k) => `<div class="t-title">${fmtDate(g.date)}</div><div class="t-row"><span>${k}</span><b>${fmtCredits(g[k])} cr</b></div>`,
+  });
+  document.getElementById('chartDaily').insertAdjacentHTML('beforebegin', `<div class="legend">${seriesKeys.map(k => `<span class="sw"><span class="dot" style="background:${seriesColors[k]}"></span>${k}</span>`).join('')}</div>`);
+
+  document.getElementById('budgetTable').innerHTML = `<thead><tr><th>Warehouse</th><th>Workload</th><th>Quota (cr)</th><th>Used MTD (cr)</th><th>% used</th></tr></thead>
+    <tbody>${budgetSorted.map(r => `<tr><td class="name">${r.name}</td><td>${r.workload}</td><td>${fmtCredits(r.quota)}</td><td>${fmtCredits(r.used)}</td><td>${fmtPct(r.pct)}</td></tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const rt = document.getElementById('roleTable');
+  const rows = DATA.cost.role_attribution;
+  if (rows.length === 0) {
+    rt.innerHTML = `<tbody><tr><td style="color:var(--ink-muted)">No query activity recorded in the last 30 days.</td></tr></tbody>`;
+  } else {
+    rt.innerHTML = `<thead><tr><th>Warehouse</th><th>Role</th><th>Queries</th><th>Exec. hours</th><th>Cloud services (cr)</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.warehouse}</td><td>${r.role}</td><td>${fmtInt(r.query_count)}</td><td>${fmtHrs(r.execution_hours)}</td><td>${fmtCredits(r.cloud_services_credits)}</td></tr>`).join('')}</tbody>`;
+  }
+  const roleCount = new Set(rows.map(r => r.role)).size;
+  document.getElementById('roleNote').innerHTML = roleCount <= 1
+    ? `<b>Single-role attribution.</b> All query activity in this window ran under one role. Warehouse-level separation (this report's §1) isolates budget; role-level attribution needs each workload on its own least-privilege service role to be meaningful — see the open follow-up on the Security &amp; Horizon Governance Report.`
+    : `Activity is split across ${roleCount} roles this period.`;
+})();
+
+(function () {
+  const ct = document.getElementById('cortexTable');
+  const rows = DATA.cost.cortex_by_source;
+  if (rows.length === 0) {
+    ct.innerHTML = `<tbody><tr><td style="color:var(--ink-muted)">No Cortex usage recorded against this account.</td></tr></tbody>`;
+  } else {
+    ct.innerHTML = `<thead><tr><th>Source</th><th>Credits</th><th>Tokens</th><th>Requests</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
+  }
+})();
+
+document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });
+</script>
