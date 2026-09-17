@@ -1,6 +1,10 @@
 """CFO / Finance lead persona. Owned by NERO_FINANCE_ROLE, the only
 leader persona granted BOTH semantic views -- revenue and platform cost
 are both finance's concern."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({

@@ -1,6 +1,10 @@
 """Regional Director persona. Owned by NERO_REGIONAL_ROLE, granted loyalty
 + search -- the first persona combining store/region performance with
 security awareness, for a leader responsible for physical store regions."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({

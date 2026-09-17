@@ -97,8 +97,8 @@ entities:
     identifier: {name: MARKETING_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/marketing_assistant.py
-    artifacts: [leaders/marketing_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/marketing_assistant/marketing_assistant.py
+    artifacts: [leaders/marketing_assistant/marketing_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Marketing Assistant"
 
   ops_assistant:
@@ -106,8 +106,8 @@ entities:
     identifier: {name: OPS_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/ops_assistant.py
-    artifacts: [leaders/ops_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/ops_assistant/ops_assistant.py
+    artifacts: [leaders/ops_assistant/ops_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Store Operations Assistant"
 
   finance_assistant:
@@ -115,8 +115,8 @@ entities:
     identifier: {name: FINANCE_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/finance_assistant.py
-    artifacts: [leaders/finance_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/finance_assistant/finance_assistant.py
+    artifacts: [leaders/finance_assistant/finance_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Finance Assistant"
 
   security_lead_assistant:
@@ -124,8 +124,8 @@ entities:
     identifier: {name: SECURITY_LEAD_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/security_lead_assistant.py
-    artifacts: [leaders/security_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/security_lead_assistant/security_lead_assistant.py
+    artifacts: [leaders/security_lead_assistant/security_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Security Assistant"
 
   platform_lead_assistant:
@@ -133,8 +133,8 @@ entities:
     identifier: {name: PLATFORM_LEAD_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/platform_lead_assistant.py
-    artifacts: [leaders/platform_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/platform_lead_assistant/platform_lead_assistant.py
+    artifacts: [leaders/platform_lead_assistant/platform_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Platform Assistant"
 
   ceo_assistant:
@@ -142,8 +142,8 @@ entities:
     identifier: {name: CEO_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/ceo_assistant.py
-    artifacts: [leaders/ceo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/ceo_assistant/ceo_assistant.py
+    artifacts: [leaders/ceo_assistant/ceo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero CEO Assistant"
 
   cx_assistant:
@@ -151,8 +151,8 @@ entities:
     identifier: {name: CX_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/cx_assistant.py
-    artifacts: [leaders/cx_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/cx_assistant/cx_assistant.py
+    artifacts: [leaders/cx_assistant/cx_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero CX Assistant"
 
   cdo_assistant:
@@ -160,8 +160,8 @@ entities:
     identifier: {name: CDO_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/cdo_assistant.py
-    artifacts: [leaders/cdo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/cdo_assistant/cdo_assistant.py
+    artifacts: [leaders/cdo_assistant/cdo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Data Assistant"
 
   audit_assistant:
@@ -169,8 +169,8 @@ entities:
     identifier: {name: AUDIT_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/audit_assistant.py
-    artifacts: [leaders/audit_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/audit_assistant/audit_assistant.py
+    artifacts: [leaders/audit_assistant/audit_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Audit Assistant"
 
   regional_assistant:
@@ -178,6 +178,6 @@ entities:
     identifier: {name: REGIONAL_ASSISTANT, schema: APPS_LEADERS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: leaders/regional_assistant.py
-    artifacts: [leaders/regional_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    main_file: leaders/regional_assistant/regional_assistant.py
+    artifacts: [leaders/regional_assistant/regional_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
     title: "Nero Regional Assistant"

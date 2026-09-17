@@ -1,5 +1,9 @@
 """CEO persona. Owned by NERO_CEO_ROLE, the only persona granted all three
 tools -- full cross-domain read access."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({

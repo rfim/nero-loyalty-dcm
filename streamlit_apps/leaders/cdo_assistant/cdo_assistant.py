@@ -1,6 +1,10 @@
 """Chief Data Officer / Data & Analytics lead persona. Owned by
 NERO_CDO_ROLE, granted loyalty + governance -- same tool combination as
 Finance, but framed around data-platform health rather than P&L."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({

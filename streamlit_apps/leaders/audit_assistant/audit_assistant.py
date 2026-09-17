@@ -1,6 +1,10 @@
 """Internal Audit / Compliance lead persona. Owned by NERO_AUDIT_ROLE,
 granted only findings_search -- same tool as the Security lead, framed
 around audit/compliance posture rather than technical remediation."""
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import persona_core
 
 persona_core.run({
