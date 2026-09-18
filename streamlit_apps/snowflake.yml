@@ -44,6 +44,21 @@ entities:
       - dashboards/security_governance_report/requirements.txt
     title: "Security & Horizon Governance Report"
 
+  pipeline_health:
+    type: streamlit
+    identifier: {name: PIPELINE_HEALTH, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    stage: streamlit_stage
+    query_warehouse: NERO_BI_WH
+    main_file: dashboards/pipeline_health/pipeline_health.py
+    artifacts:
+      - dashboards/pipeline_health/pipeline_health.py
+      - dashboards/pipeline_health/pipeline_health_template.html
+      - shared/report_common.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
+      - dashboards/pipeline_health/requirements.txt
+    title: "Pipeline Health"
+
   # ---------------- chatbots (NERO_GOVERNANCE.APPS_CHATBOTS) ----------------
   nero_assistant:
     type: streamlit

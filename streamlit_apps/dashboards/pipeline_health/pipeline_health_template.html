@@ -1,0 +1,314 @@
+<!doctype html>
+<title>Pipeline Health</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper:          #ffffff;
+    --paper-band:     #f5f6f8;
+    --ink:            #1c2b3a;
+    --ink-secondary:  #4c5c6b;
+    --ink-muted:      #8a97a3;
+    --rule:           #d7dde2;
+    --rule-strong:    #b7c1ca;
+    --accent:         #3d5a73;
+    --accent-wash:    #eaeff3;
+    --status-good:    #0ca30c;
+    --status-good-wash: #e6f5e6;
+    --status-warn:    #b8860b;
+    --status-warn-wash: #f8f0dc;
+    --status-crit:    #b23a3a;
+    --status-crit-wash: #f7e4e2;
+    --status-unknown: #8a97a3;
+    --status-unknown-wash: #eef0f2;
+    --series-1:       #3d5a73;
+    --series-2:       #7c8f9e;
+    --series-3:       #a8bcc9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+      --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+      --accent: #8fa9bd; --accent-wash: #202a32;
+      --status-good: #3fbf3f; --status-good-wash: #16311a;
+      --status-warn: #d9a441; --status-warn-wash: #3a2f15;
+      --status-crit: #d96b6b; --status-crit-wash: #3a1e1e;
+      --status-unknown: #7c8894; --status-unknown-wash: #23292f;
+      --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+    --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+    --accent: #8fa9bd; --accent-wash: #202a32;
+    --status-good: #3fbf3f; --status-good-wash: #16311a;
+    --status-warn: #d9a441; --status-warn-wash: #3a2f15;
+    --status-crit: #d96b6b; --status-crit-wash: #3a1e1e;
+    --status-unknown: #7c8894; --status-unknown-wash: #23292f;
+    --series-1: #8fa9bd; --series-2: #6c7d89; --series-3: #4d5b66;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--paper-band); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55;
+  }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1080px; margin: 0 auto; padding: 0 20px 56px; }
+
+  .title-logo { height: 28px; width: auto; display: block; margin-bottom: 10px; }
+  .titleblock {
+    background: var(--paper); border-bottom: 3px solid var(--accent);
+    padding: 34px 36px 24px; margin-top: 18px;
+  }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ---------------- pipeline flow ---------------- */
+  .flow-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .flow-row { display: flex; align-items: stretch; gap: 0; margin-top: 18px; flex-wrap: wrap; }
+  .flow-stage {
+    flex: 1 1 200px; border: 1.5px solid var(--rule-strong); border-radius: 10px;
+    padding: 16px 16px 14px; position: relative; background: var(--paper-band);
+  }
+  .flow-stage .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 7px; }
+  .flow-stage .stage-name { font-weight: 700; font-size: 13.5px; }
+  .flow-stage .stage-status { font-size: 12px; font-weight: 600; margin-top: 8px; padding: 3px 9px; border-radius: 999px; display: inline-block; }
+  .flow-stage .stage-detail { font-size: 11.5px; color: var(--ink-secondary); margin-top: 8px; }
+  .flow-stage .stage-when { font-size: 10.5px; color: var(--ink-muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
+  .flow-arrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 34px; color: var(--ink-muted); font-size: 20px; }
+  @media (max-width: 900px) { .flow-arrow { width: 100%; transform: rotate(90deg); padding: 4px 0; } .flow-row { flex-direction: column; } }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 19px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+
+  .barchart { width: 100%; overflow: visible; }
+  .bar-row-label { font-size: 11.5px; fill: var(--ink-secondary); }
+  .bar-value-label { font-size: 11.5px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar-track { fill: var(--accent-wash); }
+  .hit { fill: transparent; cursor: pointer; }
+  .bar-fill.hovered { filter: brightness(1.1); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100; background: var(--paper); border: 1px solid var(--rule-strong);
+    padding: 8px 11px; font-size: 11.5px; box-shadow: 0 6px 18px rgba(20,25,30,0.16); color: var(--ink); max-width: 230px;
+    transform: translate(-50%, -100%); opacity: 0; transition: opacity .1s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 700; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-secondary); }
+  .tooltip .t-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  .pill { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; display: inline-block; }
+  .tbl-wrap { overflow-x: auto; }
+
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block b { color: var(--ink); }
+
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <img class="title-logo" id="brandLogo" alt="Caffè Nero" />
+    <div class="kicker">Nero Platform &middot; Governance Series</div>
+    <h1>Pipeline Health</h1>
+    <p class="sub">End-to-end orchestration status: data generation &rarr; validation &rarr; transformation &rarr; what's actually live for dashboards and chatbots to read.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
+      <div class="meta-item"><div class="k">Live batch</div><div class="v" id="metaBatch"></div></div>
+      <div class="meta-item"><div class="k">Published</div><div class="v" id="metaReleased"></div></div>
+    </div>
+  </div>
+
+  <div class="flow-section">
+    <div class="panel-title" style="font-size:12.5px;font-weight:600;">Today's run, start to finish</div>
+    <div class="flow-row" id="flowRow"></div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section">
+    <span class="section-num">1.</span><span class="section-title">Data volume by layer</span>
+    <p class="section-sub">How many rows exist at each stage of the pipeline right now — raw landing, validated, and transformed.</p>
+    <svg id="chartLayers" class="barchart"></svg>
+    <div class="tbl-wrap"><table class="datatable" id="layersTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">2.</span><span class="section-title">Recent batch publishes</span>
+    <p class="section-sub">Every batch the ingestion pipeline has validated and (if valid) published, most recent first.</p>
+    <div class="tbl-wrap"><table class="datatable" id="batchTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num">3.</span><span class="section-title">Recent scheduled task runs</span>
+    <p class="section-sub">The two daily tasks that drive this pipeline — synthetic data generation and the dbt refresh.</p>
+    <div class="tbl-wrap"><table class="datatable" id="taskTable"></table></div>
+    <div class="note-block" id="taskNote"></div>
+  </section>
+
+  <footer>
+    <p>Sources: NERO_DB."02_CONTROL".CONTROL_RUN_AUDIT / CONTROL_RELEASE_POINTER, NERO_DB."00_BRONZE"/"01_SILVER", NERO_ANALYTICS."02_GOLD", SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY. Task history can lag up to a couple of hours for newly created tasks.</p>
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+document.getElementById('brandLogo').src = 'data:image/png;base64,' + DATA.logo_b64;
+
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add('show'); positionTip(evt); }
+function positionTip(evt) { tooltip.style.left = evt.clientX + 'px'; tooltip.style.top = (evt.clientY - 14) + 'px'; }
+function hideTip() { tooltip.classList.remove('show'); }
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtDateTime = (s) => s == null ? '—' : new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+const KIND_LABEL = { good: 'Healthy', warn: 'Attention', crit: 'Failed', unknown: 'No data yet' };
+
+function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, height }) {
+  const n = rows.length, rowH = height || 30, labelW = 220, valueW = 70, chartW = 380;
+  const totalW = labelW + chartW + valueW, totalH = n * rowH + 8;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  const max = Math.max(...rows.map(valueFn), 0.0001) * 1.1;
+  svgEl.innerHTML = '';
+  rows.forEach((row, i) => {
+    const y = i * rowH + 4, v = valueFn(row), w = Math.max((v / max) * chartW, 2);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelW - 8); label.setAttribute('y', y + rowH / 2 - 4); label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = labelFn(row); svgEl.appendChild(label);
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', labelW); track.setAttribute('y', y); track.setAttribute('width', chartW); track.setAttribute('height', rowH - 10);
+    track.setAttribute('class', 'bar-track'); svgEl.appendChild(track);
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    fill.setAttribute('x', labelW); fill.setAttribute('y', y); fill.setAttribute('width', w); fill.setAttribute('height', rowH - 10);
+    fill.setAttribute('fill', typeof color === 'function' ? color(row) : color); fill.setAttribute('class', 'bar-fill'); svgEl.appendChild(fill);
+    const vLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    vLabel.setAttribute('x', labelW + chartW + 10); vLabel.setAttribute('y', y + rowH / 2 - 4);
+    vLabel.setAttribute('class', 'bar-value-label'); vLabel.textContent = fmtFn(v); svgEl.appendChild(vLabel);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    hit.setAttribute('x', 0); hit.setAttribute('y', y - 2); hit.setAttribute('width', totalW); hit.setAttribute('height', rowH); hit.setAttribute('class', 'hit');
+    hit.addEventListener('mousemove', (e) => { fill.classList.add('hovered'); showTip(e, `<div class="t-title">${labelFn(row)}</div><div class="t-row"><span>Rows</span><b>${fmtInt(v)}</b></div>`); });
+    hit.addEventListener('mouseleave', () => { fill.classList.remove('hovered'); hideTip(); });
+    svgEl.appendChild(hit);
+  });
+}
+
+document.getElementById('metaGenerated').textContent = fmtDateTime(DATA.generated_at);
+document.getElementById('metaBatch').textContent = DATA.current_batch_id || '—';
+document.getElementById('metaReleased').textContent = fmtDateTime(DATA.current_release_at);
+
+(function () {
+  const flow = document.getElementById('flowRow');
+  DATA.stages.forEach((s, i) => {
+    if (i > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'flow-arrow'; arrow.textContent = '→';
+      flow.appendChild(arrow);
+    }
+    const box = document.createElement('div');
+    box.className = 'flow-stage';
+    box.style.borderColor = `var(--status-${s.kind})`;
+    box.innerHTML = `
+      <div><span class="dot" style="background:var(--status-${s.kind})"></span><span class="stage-name">${s.name}</span></div>
+      <div class="stage-status" style="background:var(--status-${s.kind}-wash);color:var(--status-${s.kind})">${KIND_LABEL[s.kind] || s.kind} — ${s.status_text}</div>
+      <div class="stage-detail">${s.detail}</div>
+      ${s.when ? `<div class="stage-when">${fmtDateTime(s.when)}</div>` : ''}
+    `;
+    flow.appendChild(box);
+  });
+})();
+
+(function () {
+  const overallKind = DATA.stages.some(s => s.kind === 'crit') ? 'crit'
+    : DATA.stages.some(s => s.kind === 'warn' || s.kind === 'unknown') ? 'warn' : 'good';
+  const bronze = DATA.layers.find(l => l.object === 'RAW_ENVELOPES');
+  const txn = DATA.layers.find(l => l.object === 'VALIDATED_TRANSACTIONS');
+  const factTxn = DATA.layers.find(l => l.object === 'FACT_SALES_TRANSACTION');
+  const kpis = [
+    { label: 'Overall status', value: KIND_LABEL[overallKind], note: `${DATA.stages.length} pipeline stages checked` },
+    { label: 'Raw envelopes landed', value: fmtInt(bronze ? bronze.count : null), note: 'NERO_DB."00_BRONZE"' },
+    { label: 'Transactions validated', value: fmtInt(txn ? txn.count : null), note: 'NERO_DB."01_SILVER"' },
+    { label: 'Transactions in gold', value: fmtInt(factTxn ? factTxn.count : null), note: 'NERO_ANALYTICS."02_GOLD"' },
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+})();
+
+(function () {
+  const rowsData = DATA.layers;
+  renderBarChart(document.getElementById('chartLayers'), rowsData, {
+    valueFn: r => r.count, labelFn: r => `${r.layer} · ${r.object}`, fmtFn: v => fmtInt(v),
+    color: r => r.layer.startsWith('Raw') ? 'var(--series-1)'.replace('var(','').replace(')','')
+      : r.layer.startsWith('Validated') ? 'var(--series-2)'.replace('var(','').replace(')','')
+      : 'var(--series-3)'.replace('var(','').replace(')',''),
+  });
+  document.getElementById('layersTable').innerHTML = `<thead><tr><th>Layer</th><th>Object</th><th>Row Count</th></tr></thead>
+    <tbody>${rowsData.map(r => `<tr><td class="name">${r.layer}</td><td>${r.object}</td><td>${fmtInt(r.count)}</td></tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const bt = document.getElementById('batchTable');
+  const rowsData = DATA.recent_batches;
+  if (rowsData.length === 0) {
+    bt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No batches recorded yet.</td></tr></tbody>';
+  } else {
+    bt.innerHTML = `<thead><tr><th>Batch ID</th><th>Status</th><th>Details</th><th>Recorded At</th></tr></thead>
+      <tbody>${rowsData.map(r => `<tr>
+        <td class="name">${r.batch_id}</td>
+        <td><span class="pill" style="background:var(--status-${r.status_kind}-wash);color:var(--status-${r.status_kind})">${r.status}</span></td>
+        <td>${Object.entries(r.details || {}).map(([k, v]) => `${k}: ${v}`).join(', ') || '—'}</td>
+        <td>${fmtDateTime(r.recorded_at)}</td>
+      </tr>`).join('')}</tbody>`;
+  }
+})();
+
+(function () {
+  const tt = document.getElementById('taskTable');
+  const rowsData = DATA.task_runs;
+  if (rowsData.length === 0) {
+    tt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No task runs recorded yet.</td></tr></tbody>';
+    document.getElementById('taskNote').innerHTML =
+      `<b>This is expected right after setup.</b> SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY can lag up to ~2 hours for newly created tasks. Section 1's flow banner falls back to the batch-publish audit trail (no lag) in the meantime, so it can still show a real status even when this table is still empty.`;
+  } else {
+    tt.innerHTML = `<thead><tr><th>Task</th><th>State</th><th>Scheduled</th><th>Completed</th></tr></thead>
+      <tbody>${rowsData.map(r => `<tr>
+        <td class="name">${r.name}</td>
+        <td><span class="pill" style="background:var(--status-${r.state_kind}-wash);color:var(--status-${r.state_kind})">${r.state}</span></td>
+        <td>${fmtDateTime(r.scheduled_at)}</td>
+        <td>${fmtDateTime(r.completed_at)}</td>
+      </tr>`).join('')}</tbody>`;
+    document.getElementById('taskNote').innerHTML = `Each task's own history page in Snowsight (Data → Databases → schema → Tasks) has full run graphs and error details beyond what fits here.`;
+  }
+})();
+
+document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });
+</script>
