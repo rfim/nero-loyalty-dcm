@@ -9,9 +9,11 @@
 -- account_setup/synthetic_daily_ingest.sql.)
 --
 -- Lands into the typed BRONZE_<DATASET> tables (sources/definitions/
--- ingestion/raw.sql) + one BRONZE_BATCH_MANIFESTS row, then calls the
--- existing, unmodified PROCESS_BATCH -- same contract validation as every
--- other load.
+-- ingestion/raw.sql) + one BRONZE_BATCH_MANIFESTS row (audit trail only).
+-- Validation/publish into silver is dbt's job now (analytics/models/
+-- silver/), not called synchronously from here -- see
+-- sources/definitions/ingestion/engine.sql for why PROCESS_BATCH was
+-- retired.
 --
 -- Not true Snowpipe -- Google Sheets isn't S3/GCS/Azure Blob, so there's no
 -- cloud event-notification integration Snowflake can subscribe to. This is
@@ -49,7 +51,7 @@ RUNTIME_VERSION = '3.11'
 PACKAGES = ('snowflake-snowpark-python', 'tzdata', 'requests')
 HANDLER = 'run'
 EXTERNAL_ACCESS_INTEGRATIONS = (NERO_GOOGLE_SHEETS_ACCESS_INTEGRATION)
-COMMENT = 'Fetches all 4 source datasets from public Google Sheets CSV exports and publishes them via PROCESS_BATCH, same contract validation as every other load. Callable directly (manual trigger) or via GOOGLE_SHEETS_INGEST_TASK (automatic trigger). See account_setup/google_sheets_ingest.sql.'
+COMMENT = 'Fetches all 4 source datasets from public Google Sheets CSV exports and lands them into bronze. dbt validates and publishes into silver separately (see analytics/models/silver/). Callable directly (manual trigger) or via GOOGLE_SHEETS_INGEST_TASK (automatic trigger). See account_setup/google_sheets_ingest.sql.'
 AS
 $$
 import csv
@@ -72,9 +74,7 @@ SOURCES = {
 
 # Mirrors ingestion/contract/datasets/*.yaml exactly. Hardcoded rather than
 # read from the contract files, same as GENERATE_SYNTHETIC_DAY() -- Snowflake
-# stored procs can't import local repo files, only the CONTRACT_HASH itself
-# is read live (below), so a real contract change would still be caught by
-# PROCESS_BATCH's hash check even though the column shapes here are fixed.
+# stored procs can't import local repo files.
 COLUMN_TYPES = {
     "stores": {"store_id": "integer", "store_name": "string", "region": "string", "format": "string", "opened_date": "date"},
     "loyalty_customers": {"customer_id": "integer", "signup_date": "date", "home_store_id": "integer", "tier": "string"},
@@ -120,51 +120,42 @@ def _land(session, dataset, rows, columns, batch_id):
 def run(session):
     # captured_at comes from Snowflake's own CURRENT_TIMESTAMP(), not this
     # sandbox's local Python clock -- observed live to run ~14 hours ahead
-    # of Snowflake's clock under EXTERNAL_ACCESS_INTEGRATIONS, which would
-    # otherwise permanently win the release-pointer's "is this batch newer"
-    # gate against every correctly-clocked adapter until real time catches
-    # up. The gate compares against Snowflake's clock, so captured_at has
-    # to come from that same clock to never drift relative to it.
+    # of Snowflake's clock under EXTERNAL_ACCESS_INTEGRATIONS. No gate
+    # depends on it anymore (PROCESS_BATCH's release pointer is retired),
+    # but sourcing every timestamp from the same clock is cheap insurance
+    # against that class of bug recurring.
     now_row = session.sql("SELECT CURRENT_TIMESTAMP() AS NOW").collect()[0]
     captured_at = now_row["NOW"]
     today = captured_at.date()
     batch_id = f"google_sheets_{today.strftime('%Y%m%d')}"
 
     already = session.sql(
-        "SELECT 1 FROM NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT WHERE BATCH_ID = ? AND STATUS = 'PUBLISHED' LIMIT 1",
+        "SELECT 1 FROM NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS WHERE BATCH_ID = ? LIMIT 1",
         params=[batch_id],
     ).collect()
     if already:
-        return {"status": "ALREADY_PUBLISHED_TODAY", "batch_id": batch_id}
-
-    pinned = session.sql(
-        "SELECT CONTRACT_HASH FROM NERO_DB.\"02_CONTROL\".CONTROL_DATA_CONTRACTS WHERE CONTRACT_ID = ? AND VERSION = ?",
-        params=[CONTRACT_ID, CONTRACT_VERSION],
-    ).collect()
-    contract_hash = pinned[0]["CONTRACT_HASH"]
+        return {"status": "ALREADY_LANDED_TODAY", "batch_id": batch_id}
 
     datasets = {name: fetch_csv_rows(url, COLUMN_TYPES[name]) for name, url in SOURCES.items()}
 
     for name, rows in datasets.items():
         _land(session, name, rows, list(COLUMN_TYPES[name].keys()), batch_id)
 
+    # Audit trail only -- dbt (analytics/models/silver/) reads
+    # BRONZE_<DATASET> directly and validates/publishes into silver itself;
+    # nothing consults this manifest to decide what to do.
     datasets_meta = {name: {"row_count": len(rows)} for name, rows in datasets.items()}
     session.sql(
         "INSERT INTO NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
-        "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
-        "SELECT ?, ?, ?, ?, ?, ?, PARSE_JSON(?)",
-        params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, contract_hash, "google_sheets",
+        "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
+        "SELECT ?, ?, ?, ?, ?, PARSE_JSON(?)",
+        params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, "google_sheets",
                 captured_at, json.dumps(datasets_meta)],
-    ).collect()
-
-    result = session.sql(
-        "CALL NERO_DB.\"02_CONTROL\".PROCESS_BATCH(?)", params=[batch_id]
     ).collect()
 
     return {
         "batch_id": batch_id,
         "row_counts": {name: len(rows) for name, rows in datasets.items()},
-        "process_batch_result": result[0][0],
     }
 $$;
 

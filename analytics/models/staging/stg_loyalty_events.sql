@@ -11,4 +11,4 @@ select
     reward_id,
     batch_id,
     current_timestamp() as dbt_loaded_at
-from {{ source('nero_validated', 'loyalty_events') }}
+from {{ ref('validated_loyalty_events') }}

@@ -5,4 +5,4 @@ select
     home_store_id,
     batch_id,
     current_timestamp() as dbt_loaded_at
-from {{ source('nero_validated', 'loyalty_customers') }}
+from {{ ref('validated_loyalty_customers') }}

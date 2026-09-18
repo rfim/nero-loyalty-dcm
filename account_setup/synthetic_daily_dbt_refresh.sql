@@ -1,8 +1,12 @@
 -- =============================================================================
 -- Daily dbt refresh, scheduled shortly after the synthetic data generator
--- (account_setup/synthetic_daily_ingest.sql) so gold/marts don't go stale
--- once SILVER starts changing daily. 15-minute offset is generous headroom
--- over the ~30s the generator+publish actually takes.
+-- (account_setup/synthetic_daily_ingest.sql) so silver/gold/marts don't go
+-- stale once bronze starts changing daily. `dbt build` now covers the whole
+-- chain in one run -- bronze->silver (analytics/models/silver/) through to
+-- staging/gold/marts -- since PROCESS_BATCH was retired in favor of dbt
+-- models/tests (see sources/definitions/ingestion/engine.sql). 15-minute
+-- offset is generous headroom over the ~30s the generator+landing actually
+-- takes.
 --
 -- Independently cron-scheduled rather than a Snowflake task DAG (AFTER)
 -- dependency on purpose -- the ingest task is owned by ACCOUNTADMIN

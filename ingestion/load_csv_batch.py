@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """One-off (but reusable) loader: converts the original 4 source CSVs
 (stores.csv, loyalty_customers.csv, transactions.csv, loyalty_events.csv)
-into one batch, lands each dataset directly into its typed BRONZE_<DATASET>
-table plus one BRONZE_BATCH_MANIFESTS row, and calls PROCESS_BATCH.
+into one batch and lands each dataset directly into its typed
+BRONZE_<DATASET> table plus one BRONZE_BATCH_MANIFESTS row (audit trail
+only). Validation/publish into silver is dbt's job now (analytics/models/
+silver/) -- see sources/definitions/ingestion/engine.sql for why
+PROCESS_BATCH was retired.
 
 Naive timestamps in transactions.csv/loyalty_events.csv are localized to
 Europe/London (the plan's own recommendation) before landing -- bronze
@@ -99,12 +102,12 @@ def land_dataset(connection, ds_name, ds_spec, rows, batch_id, tmp_dir):
     subprocess.run(["snow", "sql", "-c", connection, "-q", copy_sql], check=True)
 
 
-def insert_manifest(connection, batch_id, contract, contract_hash, dataset_rows, captured_at):
+def insert_manifest(connection, batch_id, contract, dataset_rows, captured_at):
     datasets_json = json.dumps({name: {"row_count": len(rows)} for name, rows in dataset_rows.items()})
     sql = f"""
     INSERT INTO NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS
-        (BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS)
-    SELECT '{batch_id}', '{contract["contract_id"]}', {contract["version"]}, '{contract_hash}',
+        (BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, SOURCE_SYSTEM, CAPTURED_AT, DATASETS)
+    SELECT '{batch_id}', '{contract["contract_id"]}', {contract["version"]},
         'csv_archive_upload', '{captured_at}', PARSE_JSON($${datasets_json}$$);
     """
     subprocess.run(["snow", "sql", "-c", connection, "-q", sql], check=True)
@@ -117,15 +120,13 @@ def main():
     parser.add_argument("--batch-id", default=None)
     args = parser.parse_args()
 
-    doc, contract_hash = load_contract()
+    doc, _ = load_contract()
     batch_id = args.batch_id or f"csv_load_{int(time.time())}"
-    # From Snowflake's own clock, not this machine's -- the release-pointer
-    # gate compares captured_at against Snowflake's CURRENT_TIMESTAMP(), and
-    # a stored proc under EXTERNAL_ACCESS_INTEGRATIONS was observed live
-    # running ~14 hours ahead of it (see account_setup/google_sheets_ingest.sql).
-    # This script's own clock proved accurate, but sourcing captured_at from
-    # the same clock the gate compares against is the only version of this
-    # that can never drift relative to it.
+    # From Snowflake's own clock, not this machine's -- a stored proc under
+    # EXTERNAL_ACCESS_INTEGRATIONS was observed live running ~14 hours ahead
+    # of it (see account_setup/google_sheets_ingest.sql). Nothing gates on
+    # this timestamp anymore, but keeping every adapter's captured_at
+    # sourced the same way is cheap insurance against that bug recurring.
     captured_at_result = subprocess.run(
         ["snow", "sql", "-c", args.connection, "--format", "JSON", "-q", "SELECT CURRENT_TIMESTAMP() AS NOW;"],
         check=True, capture_output=True, text=True,
@@ -142,12 +143,9 @@ def main():
         land_dataset(args.connection, ds_name, ds_spec, dataset_rows[ds_name], batch_id, tmp_dir)
         print(f"{ds_name}: {len(dataset_rows[ds_name])} rows landed")
 
-    insert_manifest(args.connection, batch_id, doc, contract_hash, dataset_rows, captured_at)
-
-    call_sql = f'CALL NERO_DB."02_CONTROL".PROCESS_BATCH(\'{batch_id}\');'
-    result = subprocess.run(["snow", "sql", "-c", args.connection, "--format", "JSON", "-q", call_sql],
-                             check=True, capture_output=True, text=True)
-    print(result.stdout)
+    insert_manifest(args.connection, batch_id, doc, dataset_rows, captured_at)
+    print(f"Landed batch {batch_id} into bronze. Run `dbt build` (or wait for "
+          f"DBT_DAILY_REFRESH_TASK) to validate and publish into silver.")
 
 
 if __name__ == "__main__":

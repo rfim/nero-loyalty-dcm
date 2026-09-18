@@ -143,8 +143,8 @@
     <p class="sub">End-to-end orchestration status: data generation &rarr; validation &rarr; transformation &rarr; what's actually live for dashboards and chatbots to read.</p>
     <div class="meta-row">
       <div class="meta-item"><div class="k">Generated</div><div class="v" id="metaGenerated"></div></div>
-      <div class="meta-item"><div class="k">Live batch</div><div class="v" id="metaBatch"></div></div>
-      <div class="meta-item"><div class="k">Published</div><div class="v" id="metaReleased"></div></div>
+      <div class="meta-item"><div class="k">Last batch landed</div><div class="v" id="metaBatch"></div></div>
+      <div class="meta-item"><div class="k">Captured at</div><div class="v" id="metaReleased"></div></div>
     </div>
   </div>
 
@@ -163,8 +163,8 @@
   </section>
 
   <section class="doc-section">
-    <span class="section-num">2.</span><span class="section-title">Recent batch publishes</span>
-    <p class="section-sub">Every batch the ingestion pipeline has validated and (if valid) published, most recent first.</p>
+    <span class="section-num">2.</span><span class="section-title">Recent batches landed</span>
+    <p class="section-sub">Every batch an ingestion adapter has landed into bronze, most recent first. Validation/publish into silver now happens in dbt, not here.</p>
     <div class="tbl-wrap"><table class="datatable" id="batchTable"></table></div>
   </section>
 
@@ -224,8 +224,8 @@ function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, height })
 }
 
 document.getElementById('metaGenerated').textContent = fmtDateTime(DATA.generated_at);
-document.getElementById('metaBatch').textContent = DATA.current_batch_id || '—';
-document.getElementById('metaReleased').textContent = fmtDateTime(DATA.current_release_at);
+document.getElementById('metaBatch').textContent = DATA.last_batch_id || '—';
+document.getElementById('metaReleased').textContent = fmtDateTime(DATA.last_batch_captured_at);
 
 (function () {
   const flow = document.getElementById('flowRow');
@@ -251,12 +251,12 @@ document.getElementById('metaReleased').textContent = fmtDateTime(DATA.current_r
 (function () {
   const overallKind = DATA.stages.some(s => s.kind === 'crit') ? 'crit'
     : DATA.stages.some(s => s.kind === 'warn' || s.kind === 'unknown') ? 'warn' : 'good';
-  const bronze = DATA.layers.find(l => l.object === 'RAW_ENVELOPES');
+  const bronze = DATA.layers.find(l => l.layer === 'Raw landing (Bronze)');
   const txn = DATA.layers.find(l => l.object === 'VALIDATED_TRANSACTIONS');
   const factTxn = DATA.layers.find(l => l.object === 'FACT_SALES_TRANSACTION');
   const kpis = [
     { label: 'Overall status', value: KIND_LABEL[overallKind], note: `${DATA.stages.length} pipeline stages checked` },
-    { label: 'Raw envelopes landed', value: fmtInt(bronze ? bronze.count : null), note: 'NERO_DB."00_BRONZE"' },
+    { label: 'Bronze rows landed', value: fmtInt(bronze ? bronze.count : null), note: 'NERO_DB."00_BRONZE"' },
     { label: 'Transactions validated', value: fmtInt(txn ? txn.count : null), note: 'NERO_DB."01_SILVER"' },
     { label: 'Transactions in gold', value: fmtInt(factTxn ? factTxn.count : null), note: 'NERO_ANALYTICS."02_GOLD"' },
   ];
@@ -279,14 +279,14 @@ document.getElementById('metaReleased').textContent = fmtDateTime(DATA.current_r
   const bt = document.getElementById('batchTable');
   const rowsData = DATA.recent_batches;
   if (rowsData.length === 0) {
-    bt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No batches recorded yet.</td></tr></tbody>';
+    bt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No batches landed yet.</td></tr></tbody>';
   } else {
-    bt.innerHTML = `<thead><tr><th>Batch ID</th><th>Status</th><th>Details</th><th>Recorded At</th></tr></thead>
+    bt.innerHTML = `<thead><tr><th>Batch ID</th><th>Source</th><th>Row Counts</th><th>Captured At</th></tr></thead>
       <tbody>${rowsData.map(r => `<tr>
         <td class="name">${r.batch_id}</td>
-        <td><span class="pill" style="background:var(--status-${r.status_kind}-wash);color:var(--status-${r.status_kind})">${r.status}</span></td>
-        <td>${Object.entries(r.details || {}).map(([k, v]) => `${k}: ${v}`).join(', ') || '—'}</td>
-        <td>${fmtDateTime(r.recorded_at)}</td>
+        <td><span class="pill" style="background:var(--status-good-wash);color:var(--status-good)">${r.source_system || '—'}</span></td>
+        <td>${Object.entries(r.datasets || {}).map(([k, v]) => `${k}: ${v.row_count}`).join(', ') || '—'}</td>
+        <td>${fmtDateTime(r.captured_at)}</td>
       </tr>`).join('')}</tbody>`;
   }
 })();

@@ -23,45 +23,39 @@ with current_customer as (
     where is_current and customer_id is not null
 ),
 
-customer_key_to_id as (
-    select customer_key, customer_id
-    from {{ ref('dim_customer_scd') }}
-    where customer_id is not null
-),
-
+-- No more release pointer to gate against (PROCESS_BATCH retired in favor
+-- of dbt models/tests) -- "as of" is just today, since silver now always
+-- reflects whatever's currently landed rather than a specific approved,
+-- compare-and-set batch.
 as_of as (
-    select current_release_at::date as reporting_as_of_date
-    from {{ source('nero_control', 'release_pointer') }}
+    select current_date() as reporting_as_of_date
 ),
 
 txn_agg as (
     select
-        m.customer_id,
-        min(d.full_date) as first_transaction_date,
-        max(d.full_date) as latest_transaction_date,
-        sum(case when d.full_date >= dateadd('day', -30, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_30d,
-        sum(case when d.full_date >= dateadd('day', -30, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_30d,
-        sum(case when d.full_date >= dateadd('day', -60, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_60d,
-        sum(case when d.full_date >= dateadd('day', -60, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_60d,
-        sum(case when d.full_date >= dateadd('day', -90, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_90d,
-        sum(case when d.full_date >= dateadd('day', -90, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_90d
-    from {{ ref('fact_sales_transaction') }} f
-    join {{ ref('dim_date') }} d on d.date_key = f.transaction_date_key
-    join customer_key_to_id m on m.customer_key = f.customer_key
+        f.customer_id,
+        min(f.transaction_date) as first_transaction_date,
+        max(f.transaction_date) as latest_transaction_date,
+        sum(case when f.transaction_date >= dateadd('day', -30, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_30d,
+        sum(case when f.transaction_date >= dateadd('day', -30, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_30d,
+        sum(case when f.transaction_date >= dateadd('day', -60, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_60d,
+        sum(case when f.transaction_date >= dateadd('day', -60, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_60d,
+        sum(case when f.transaction_date >= dateadd('day', -90, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_90d,
+        sum(case when f.transaction_date >= dateadd('day', -90, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_90d
+    from {{ ref('stg_transactions') }} f
     cross join as_of ao
-    group by m.customer_id
+    where f.customer_id is not null
+    group by f.customer_id
 ),
 
 event_agg as (
     select
-        m.customer_id,
-        max(d.full_date) as latest_event_date,
-        sum(f.earn_count) as earn_count,
-        sum(f.redeem_count) as redeem_count
-    from {{ ref('fact_loyalty_event') }} f
-    join {{ ref('dim_date') }} d on d.date_key = f.event_date_key
-    join customer_key_to_id m on m.customer_key = f.customer_key
-    group by m.customer_id
+        f.customer_id,
+        max(f.event_date) as latest_event_date,
+        count_if(f.event_type = 'earn') as earn_count,
+        count_if(f.event_type = 'redeem') as redeem_count
+    from {{ ref('stg_loyalty_events') }} f
+    group by f.customer_id
 ),
 
 base as (

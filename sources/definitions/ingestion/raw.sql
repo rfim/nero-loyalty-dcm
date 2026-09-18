@@ -60,11 +60,10 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS (
     BATCH_ID          VARCHAR(200)  NOT NULL,
     CONTRACT_ID       VARCHAR(200)  NOT NULL,
     CONTRACT_VERSION  NUMBER        NOT NULL,
-    CONTRACT_HASH     VARCHAR(64)   NOT NULL,
     SOURCE_SYSTEM     VARCHAR(200),
     CAPTURED_AT       TIMESTAMP_TZ  NOT NULL,
     DATASETS          VARIANT       NOT NULL,
     INGESTED_AT       TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),
     PRIMARY KEY (BATCH_ID)
 )
-COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count, load_mode, watermark_value} in DATASETS. PROCESS_BATCH reads this instead of a manifest-type envelope row.';
+COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count} in DATASETS. Audit trail only -- dbt reads BRONZE_<DATASET> directly and does not consult this table.';
