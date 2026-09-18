@@ -121,6 +121,35 @@ def load_cost_data():
     period_start = one(f"SELECT MIN(USAGE_DATE) AS D FROM {GOV}.COST.WAREHOUSE_CREDITS_DAILY")["D"]
     period_end = one(f"SELECT MAX(USAGE_DATE) AS D FROM {GOV}.COST.WAREHOUSE_CREDITS_DAILY")["D"]
 
+    monthly_rows = rows(f"""
+        SELECT DATE_TRUNC('month', USAGE_DATE) AS MONTH, SUM(CREDITS) AS C
+        FROM {GOV}.COST.ALL_COMPUTE_CREDITS_DAILY
+        GROUP BY MONTH ORDER BY MONTH
+    """)
+    current_month_key = today.strftime("%Y-%m")
+    monthly_breakdown = []
+    for r in monthly_rows:
+        m = r["MONTH"]
+        actual_credits = float(r["C"] or 0)
+        month_key = m.strftime("%Y-%m")
+        is_current = month_key == current_month_key
+        # Completed months are already final; only the in-progress month
+        # needs the same linear (days-elapsed / days-in-month) projection
+        # used for the warehouse-only forecast above, applied here to all
+        # metered compute (warehouse + Cortex) for a whole-account estimate.
+        estimated_credits = (
+            (actual_credits / days_elapsed * days_in_month) if is_current and days_elapsed else actual_credits
+        )
+        monthly_breakdown.append({
+            "month": month_key,
+            "month_label": m.strftime("%B %Y"),
+            "is_current": is_current,
+            "actual_credits": actual_credits,
+            "actual_usd": actual_credits * credit_rate,
+            "estimated_credits": estimated_credits,
+            "estimated_usd": estimated_credits * credit_rate,
+        })
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "period_start": str(period_start) if period_start else None,
@@ -140,6 +169,7 @@ def load_cost_data():
             "cortex_credits_lifetime": cortex_credits_lifetime,
             "cortex_usd_lifetime": cortex_credits_lifetime * credit_rate,
             "warehouse_user_costs": warehouse_user_costs,
+            "monthly_breakdown": monthly_breakdown,
         },
     }
 
@@ -159,6 +189,12 @@ def build_cost_pdf(d: dict) -> bytes:
     role_rows = [[r["warehouse"], r["role"], f"{r['query_count']:,}", f"{r['execution_hours']:.2f}", f"{r['cloud_services_credits']:.3f}"] for r in c["role_attribution"]] or [["—", "No query activity in the last 30 days", "", "", ""]]
     cortex_rows = [[r["source"], f"{r['credits']:.3f}", f"{r['tokens']:,}", f"{r['requests']:,}"] for r in c["cortex_by_source"]] or [["—", "No Cortex usage recorded", "", ""]]
     wu_rows = [[r["warehouse"], r["user"], f"{r['query_count']:,}", f"{r['credits']:.3f}"] for r in c["warehouse_user_costs"]] or [["—", "No data yet — QUERY_ATTRIBUTION_HISTORY lags up to ~24h", "", ""]]
+    monthly_rows = [
+        [m["month_label"], f"{m['actual_credits']:.3f}", f"${m['actual_usd']:.2f}",
+         f"${m['estimated_usd']:.2f}" if m["is_current"] else "—",
+         "In progress" if m["is_current"] else "Complete"]
+        for m in c["monthly_breakdown"]
+    ] or [["—", "No usage history yet", "", "", ""]]
 
     sections = [
         ("Executive Summary", [
@@ -198,6 +234,16 @@ def build_cost_pdf(d: dict) -> bytes:
                 "once the lag clears this table attributes spend to an actual identity per warehouse."
             ),
         ]),
+        ("5. Monthly Spend & Estimate", [
+            rc.styled_table(["Month", "Credits", "Actual USD", "Projected Month-End USD", "Status"], monthly_rows,
+                             col_widths=[100, 80, 90, 130, 90]),
+            rc.caption(
+                "Whole-account compute (warehouses + Cortex) grouped by calendar month, from "
+                "NERO_GOVERNANCE.COST.ALL_COMPUTE_CREDITS_DAILY. Completed months show final actuals; "
+                "the current month's 'Projected Month-End' is a linear estimate from days elapsed "
+                "so far this month, same method as the month-to-date forecast in the Executive Summary."
+            ),
+        ]),
     ]
     return rc.build_pdf(
         report_title="Cost Governance Report",
@@ -221,6 +267,11 @@ def build_cost_excel(d: dict) -> bytes:
         ]) if c["daily_by_warehouse"] else pd.DataFrame([{"Date": None}]),
         "Cost by Warehouse & User": pd.DataFrame(c["warehouse_user_costs"] or [{"warehouse": "", "user": "", "query_count": 0, "credits": 0}])
             .rename(columns={"warehouse": "Warehouse", "user": "User", "query_count": "Queries", "credits": "Credits Attributed"}),
+        "Monthly Spend": pd.DataFrame(
+            c["monthly_breakdown"] or [{"month_label": "", "actual_credits": 0, "actual_usd": 0, "estimated_usd": 0, "is_current": False}]
+        )[["month_label", "actual_credits", "actual_usd", "estimated_usd", "is_current"]]
+            .rename(columns={"month_label": "Month", "actual_credits": "Credits", "actual_usd": "Actual USD",
+                              "estimated_usd": "Projected Month-End USD", "is_current": "In Progress"}),
     }
     return rc.write_excel_workbook(
         title="Cost Governance Report",

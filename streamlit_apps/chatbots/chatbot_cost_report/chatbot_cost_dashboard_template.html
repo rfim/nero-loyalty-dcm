@@ -59,7 +59,11 @@
   .bar-value-label { font-size: 11.5px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
   .bar-track { fill: var(--accent-wash); }
   .hit { fill: transparent; cursor: pointer; }
-  .bar-fill.hovered { filter: brightness(1.1); }
+  .bar-fill.hovered, .seg.hovered { filter: brightness(1.1); }
+  .axis-line { stroke: var(--rule-strong); stroke-width: 1; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-secondary); margin-bottom: 10px; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 9px; height: 9px; display: inline-block; }
   .tooltip {
     position: fixed; pointer-events: none; z-index: 100; background: var(--paper); border: 1px solid var(--rule-strong);
     padding: 8px 11px; font-size: 11.5px; box-shadow: 0 6px 18px rgba(20,25,30,0.16); color: var(--ink); max-width: 240px;
@@ -109,6 +113,13 @@
     <div class="note-block" id="toolNote"></div>
   </section>
 
+  <section class="doc-section">
+    <span class="section-num">3.</span><span class="section-title">Monthly spend &amp; estimate</span>
+    <p class="section-sub">Chatbot agent spend by calendar month. The current month's bar splits actual-so-far from a linear projection to month end.</p>
+    <svg id="chartMonthly" class="barchart"></svg>
+    <div class="tbl-wrap"><table class="datatable" id="monthlyTable"></table></div>
+  </section>
+
   <footer>
     <p>Sources: SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY, CORTEX_ANALYST_USAGE_HISTORY, CORTEX_SEARCH_DAILY_USAGE_HISTORY, wrapped by NERO_GOVERNANCE.COST. These carry replication latency of up to several hours.</p>
   </footer>
@@ -154,6 +165,34 @@ function renderBarChart(svgEl, rows, { valueFn, labelFn, fmtFn, color, height })
   });
 }
 
+function renderStackedBarChart(svgEl, groups, seriesKeys, seriesColors, { tipRows }) {
+  const n = groups.length, chartH = 200, axisW = 40, topPad = 10, botPad = 24, gap = 10, barW = 34;
+  const totalH = chartH + topPad + botPad, totalW = axisW + n * (barW + gap) + gap;
+  svgEl.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`); svgEl.setAttribute('width', '100%'); svgEl.style.height = totalH + 'px';
+  svgEl.innerHTML = '';
+  const max = Math.max(...groups.map(g => seriesKeys.reduce((s, k) => s + (g[k] || 0), 0)), 0.0001) * 1.15;
+  const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  axis.setAttribute('x1', axisW); axis.setAttribute('x2', axisW); axis.setAttribute('y1', topPad); axis.setAttribute('y2', topPad + chartH);
+  axis.setAttribute('class', 'axis-line'); svgEl.appendChild(axis);
+  groups.forEach((g, gi) => {
+    const x = axisW + gap + gi * (barW + gap);
+    let yCursor = topPad + chartH;
+    seriesKeys.forEach((k) => {
+      const v = g[k] || 0; if (v <= 0) return;
+      const h = Math.max((v / max) * chartH - 2, 0); yCursor -= (h + 2);
+      const seg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      seg.setAttribute('x', x); seg.setAttribute('y', yCursor); seg.setAttribute('width', barW); seg.setAttribute('height', h);
+      seg.setAttribute('fill', seriesColors[k]); seg.setAttribute('class', 'seg');
+      seg.addEventListener('mousemove', (e) => { seg.classList.add('hovered'); showTip(e, tipRows(g, k)); });
+      seg.addEventListener('mouseleave', () => { seg.classList.remove('hovered'); hideTip(); });
+      svgEl.appendChild(seg);
+    });
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', x + barW / 2); label.setAttribute('y', topPad + chartH + 16); label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'bar-row-label'); label.textContent = g.label; svgEl.appendChild(label);
+  });
+}
+
 document.getElementById('metaGenerated').textContent = new Date(DATA.generated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 document.getElementById('metaRate').textContent = `$${DATA.credit_rate.toFixed(2)} / credit`;
 document.getElementById('metaRequests').textContent = DATA.total_requests;
@@ -190,6 +229,33 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><d
       <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtUsd(r.credits * DATA.credit_rate)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
   }
   document.getElementById('toolNote').innerHTML = `<b>Why this might be empty even with agent usage above:</b> when Cortex Analyst/Search are called <em>through</em> an agent's lite-run request, Snowflake may attribute the full cost to CORTEX_AGENT_USAGE_HISTORY rather than logging a separate line here. Section 1 is the authoritative total; this section is a supplementary breakdown when Snowflake does log it separately.`;
+})();
+
+(function () {
+  const rows = DATA.monthly_breakdown;
+  const mt = document.getElementById('monthlyTable');
+  if (rows.length === 0) {
+    document.getElementById('chartMonthly').outerHTML = '<p style="color:var(--ink-muted)">No usage history yet.</p>';
+    mt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No data.</td></tr></tbody>';
+    return;
+  }
+  const actualColor = getComputedStyle(document.documentElement).getPropertyValue('--series-1').trim();
+  const projectedColor = getComputedStyle(document.documentElement).getPropertyValue('--series-3').trim();
+  const groups = rows.map(m => ({
+    label: m.month_label.slice(0, 3), month_label: m.month_label, is_current: m.is_current,
+    actual: m.actual_usd, projected: m.is_current ? Math.max(m.estimated_usd - m.actual_usd, 0) : 0,
+  }));
+  renderStackedBarChart(document.getElementById('chartMonthly'), groups, ['actual', 'projected'],
+    { actual: actualColor, projected: projectedColor }, {
+      tipRows: (g, k) => k === 'actual'
+        ? `<div class="t-title">${g.month_label}</div><div class="t-row"><span>Actual${g.is_current ? ' so far' : ''}</span><b>${fmtUsd(g.actual)}</b></div>`
+        : `<div class="t-title">${g.month_label}</div><div class="t-row"><span>Projected remainder</span><b>${fmtUsd(g.projected)}</b></div><div class="t-row"><span>Projected total</span><b>${fmtUsd(g.actual + g.projected)}</b></div>`,
+    });
+  document.getElementById('chartMonthly').insertAdjacentHTML('beforebegin',
+    `<div class="legend"><span class="sw"><span class="dot" style="background:${actualColor}"></span>Actual</span><span class="sw"><span class="dot" style="background:${projectedColor}"></span>Projected remainder (current month)</span></div>`);
+
+  mt.innerHTML = `<thead><tr><th>Month</th><th>Credits</th><th>Actual USD</th><th>Projected month-end</th><th>Status</th></tr></thead>
+    <tbody>${rows.map(m => `<tr><td class="name">${m.month_label}</td><td>${fmtCredits(m.actual_credits)}</td><td>${fmtUsd(m.actual_usd)}</td><td>${m.is_current ? fmtUsd(m.estimated_usd) : '—'}</td><td>${m.is_current ? 'In progress' : 'Complete'}</td></tr>`).join('')}</tbody>`;
 })();
 
 document.addEventListener('mousemove', (e) => { if (tooltip.classList.contains('show')) positionTip(e); });

@@ -8,6 +8,7 @@ AGENT_NAME column is always null for its traffic. A user_name matching
 STPLATSTREAMLIT... is the chatbot's own Streamlit service identity --
 i.e. real evidence someone used the chat UI, not just API testing.
 """
+import calendar
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -68,6 +69,35 @@ def load_data():
         for r in tool_rows
     ]
 
+    monthly_rows = rows(f"""
+        SELECT DATE_TRUNC('month', USAGE_DATE) AS MONTH, SUM(CREDITS) AS C, SUM(REQUEST_COUNT) AS R
+        FROM {GOV}.COST.CHATBOT_AGENT_CREDITS_DAILY
+        GROUP BY MONTH ORDER BY MONTH
+    """)
+    today = datetime.now(timezone.utc)
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    days_elapsed = today.day
+    current_month_key = today.strftime("%Y-%m")
+    monthly_breakdown = []
+    for r in monthly_rows:
+        m = r["MONTH"]
+        actual_credits = float(r["C"] or 0)
+        month_key = m.strftime("%Y-%m")
+        is_current = month_key == current_month_key
+        estimated_credits = (
+            (actual_credits / days_elapsed * days_in_month) if is_current and days_elapsed else actual_credits
+        )
+        monthly_breakdown.append({
+            "month": month_key,
+            "month_label": m.strftime("%B %Y"),
+            "is_current": is_current,
+            "actual_credits": actual_credits,
+            "actual_usd": actual_credits * credit_rate,
+            "estimated_credits": estimated_credits,
+            "estimated_usd": estimated_credits * credit_rate,
+            "request_count": int(r["R"] or 0),
+        })
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "credit_rate": credit_rate,
@@ -76,6 +106,7 @@ def load_data():
         "total_requests": total_requests,
         "by_user": by_user,
         "tool_usage": tool_usage,
+        "monthly_breakdown": monthly_breakdown,
     }
 
 
@@ -96,6 +127,12 @@ def build_pdf(d: dict) -> bytes:
         [t["source"], f"{t['credits']:.4f}", f"${t['credits'] * rate:.2f}", f"{t['requests']:,}"]
         for t in d["tool_usage"]
     ] or [["—", "No standalone tool usage recorded", "", ""]]
+    monthly_rows = [
+        [m["month_label"], f"{m['actual_credits']:.4f}", f"${m['actual_usd']:.2f}",
+         f"${m['estimated_usd']:.2f}" if m["is_current"] else "—",
+         "In progress" if m["is_current"] else "Complete"]
+        for m in d["monthly_breakdown"]
+    ] or [["—", "No usage history yet", "", "", ""]]
     sections = [
         ("Executive Summary", [
             rc.body(f"Total chatbot spend to date: <b>${d['total_usd']:.2f}</b> ({d['total_credits']:.4f} credits at ${d['credit_rate']:.2f}/credit) across <b>{d['total_requests']}</b> agent requests."),
@@ -106,6 +143,15 @@ def build_pdf(d: dict) -> bytes:
         ]),
         ("2. Underlying Tool Usage", [
             rc.styled_table(["Tool", "Credits", "USD", "Requests"], tool_rows, col_widths=[150, 100, 100, 110]),
+        ]),
+        ("3. Monthly Spend & Estimate", [
+            rc.styled_table(["Month", "Credits", "Actual USD", "Projected Month-End USD", "Status"], monthly_rows,
+                             col_widths=[100, 80, 90, 130, 90]),
+            rc.caption(
+                "Grouped by calendar month from NERO_GOVERNANCE.COST.CHATBOT_AGENT_CREDITS_DAILY. Completed "
+                "months show final actuals; the current month's 'Projected Month-End' is a linear estimate "
+                "from days elapsed so far this month."
+            ),
         ]),
     ]
     return rc.build_pdf(
@@ -132,6 +178,11 @@ def build_excel(d: dict) -> bytes:
             .rename(columns={"user_name": "User", "request_count": "Requests", "credits": "Credits", "usd": "USD", "tokens": "Tokens"}),
         "Tool Usage": pd.DataFrame(tool_usage)
             .rename(columns={"source": "Tool", "credits": "Credits", "usd": "USD", "requests": "Requests"}),
+        "Monthly Spend": pd.DataFrame(
+            d["monthly_breakdown"] or [{"month_label": "", "actual_credits": 0, "actual_usd": 0, "estimated_usd": 0, "is_current": False}]
+        )[["month_label", "actual_credits", "actual_usd", "estimated_usd", "is_current"]]
+            .rename(columns={"month_label": "Month", "actual_credits": "Credits", "actual_usd": "Actual USD",
+                              "estimated_usd": "Projected Month-End USD", "is_current": "In Progress"}),
     }
     return rc.write_excel_workbook(
         title="Chatbot Cost Governance Report",
