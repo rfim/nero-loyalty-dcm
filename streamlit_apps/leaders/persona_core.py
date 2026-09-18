@@ -32,6 +32,7 @@ while not (_p / "shared").is_dir() and _p != _p.parent:
     _p = _p.parent
 _sys.path.insert(0, str(_p / "shared"))
 
+import branding
 import chat_export
 import chat_store
 
@@ -165,6 +166,7 @@ def run(config: dict):
             """)
         st.caption(f"Signed in as `{current_user}`")
 
+    st.image(branding.LOGO_BYTES, width=130)
     st.markdown(f'<h1 id="{title_id}">{config["title"]}</h1>', unsafe_allow_html=True)
     st.markdown(f'<div class="nero-tagline">{config["tagline"]}</div>', unsafe_allow_html=True)
 

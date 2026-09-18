@@ -10,6 +10,8 @@ entities:
     artifacts:
       - dashboards/loyalty_trading_pulse/loyalty_trading_pulse.py
       - dashboards/loyalty_trading_pulse/dashboard_template.html
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
     title: "Loyalty & Trading Pulse"
 
   cost_governance_report:
@@ -22,6 +24,8 @@ entities:
       - dashboards/cost_governance_report/cost_report.py
       - dashboards/cost_governance_report/cost_dashboard_template.html
       - shared/report_common.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - dashboards/cost_governance_report/requirements.txt
     title: "Cost Governance Report"
 
@@ -35,6 +39,8 @@ entities:
       - dashboards/security_governance_report/security_report.py
       - dashboards/security_governance_report/security_dashboard_template.html
       - shared/report_common.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - dashboards/security_governance_report/requirements.txt
     title: "Security & Horizon Governance Report"
 
@@ -49,6 +55,8 @@ entities:
       - chatbots/nero_assistant/nero_assistant.py
       - shared/chat_store.py
       - shared/chat_export.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - chatbots/nero_assistant/requirements.txt
     title: "Nero Assistant"
 
@@ -62,6 +70,8 @@ entities:
       - chatbots/nero_governance_assistant/nero_governance_assistant.py
       - shared/chat_store.py
       - shared/chat_export.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - chatbots/nero_governance_assistant/requirements.txt
     title: "Nero Governance Assistant"
 
@@ -75,6 +85,8 @@ entities:
       - chatbots/chatbot_cost_report/chatbot_cost_report.py
       - chatbots/chatbot_cost_report/chatbot_cost_dashboard_template.html
       - shared/report_common.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - chatbots/chatbot_cost_report/requirements.txt
     title: "Chatbot Cost Governance Report"
 
@@ -88,6 +100,8 @@ entities:
       - chatbots/chatbot_security_report/chatbot_security_report.py
       - chatbots/chatbot_security_report/chatbot_security_dashboard_template.html
       - shared/report_common.py
+      - shared/branding.py
+      - shared/assets/caffe_nero_logo.png
       - chatbots/chatbot_security_report/requirements.txt
     title: "Chatbot Security Governance Report"
 
@@ -98,7 +112,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/marketing_assistant/marketing_assistant.py
-    artifacts: [leaders/marketing_assistant/marketing_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/marketing_assistant/marketing_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Marketing Assistant"
 
   ops_assistant:
@@ -107,7 +121,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/ops_assistant/ops_assistant.py
-    artifacts: [leaders/ops_assistant/ops_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/ops_assistant/ops_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Store Operations Assistant"
 
   finance_assistant:
@@ -116,7 +130,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/finance_assistant/finance_assistant.py
-    artifacts: [leaders/finance_assistant/finance_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/finance_assistant/finance_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Finance Assistant"
 
   security_lead_assistant:
@@ -125,7 +139,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/security_lead_assistant/security_lead_assistant.py
-    artifacts: [leaders/security_lead_assistant/security_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/security_lead_assistant/security_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Security Assistant"
 
   platform_lead_assistant:
@@ -134,7 +148,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/platform_lead_assistant/platform_lead_assistant.py
-    artifacts: [leaders/platform_lead_assistant/platform_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/platform_lead_assistant/platform_lead_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Platform Assistant"
 
   ceo_assistant:
@@ -143,7 +157,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/ceo_assistant/ceo_assistant.py
-    artifacts: [leaders/ceo_assistant/ceo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/ceo_assistant/ceo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero CEO Assistant"
 
   cx_assistant:
@@ -152,7 +166,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/cx_assistant/cx_assistant.py
-    artifacts: [leaders/cx_assistant/cx_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/cx_assistant/cx_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero CX Assistant"
 
   cdo_assistant:
@@ -161,7 +175,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/cdo_assistant/cdo_assistant.py
-    artifacts: [leaders/cdo_assistant/cdo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/cdo_assistant/cdo_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Data Assistant"
 
   audit_assistant:
@@ -170,7 +184,7 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/audit_assistant/audit_assistant.py
-    artifacts: [leaders/audit_assistant/audit_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/audit_assistant/audit_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Audit Assistant"
 
   regional_assistant:
@@ -179,5 +193,5 @@ entities:
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
     main_file: leaders/regional_assistant/regional_assistant.py
-    artifacts: [leaders/regional_assistant/regional_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, leaders/requirements.txt]
+    artifacts: [leaders/regional_assistant/regional_assistant.py, leaders/persona_core.py, shared/chat_store.py, shared/chat_export.py, shared/branding.py, shared/assets/caffe_nero_logo.png, leaders/requirements.txt]
     title: "Nero Regional Assistant"

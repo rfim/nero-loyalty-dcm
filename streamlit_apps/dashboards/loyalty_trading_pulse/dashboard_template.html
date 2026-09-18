@@ -122,7 +122,8 @@
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
   }
-  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo { height: 26px; width: auto; display: block; }
   .brand .mark { font-family: "Fraunces", serif; font-weight: 600; font-style: italic; font-size: 20px; color: var(--brand-ink); }
   .brand .sub { color: var(--ink-muted); font-size: 12.5px; letter-spacing: .02em; }
   .brand .source { color: var(--ink-muted); font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; margin-left: 4px; }
@@ -230,7 +231,7 @@
 
   <div class="topbar">
     <div class="brand">
-      <span class="mark">Caffè Nero</span>
+      <img class="brand-logo" id="brandLogo" alt="Caffè Nero" />
       <span class="sub">Loyalty &amp; Trading Pulse</span>
       <span class="source">live · NERO_DB."01_SILVER"</span>
     </div>
@@ -355,6 +356,7 @@
 
 <script>
 const DATA = __DATA_JSON__;
+document.getElementById('brandLogo').src = 'data:image/png;base64,' + DATA.logo_b64;
 
 const tooltip = document.getElementById('tooltip');
 function showTip(evt, html) {

@@ -22,6 +22,7 @@ while not (_p / "shared").is_dir() and _p != _p.parent:
     _p = _p.parent
 _sys.path.insert(0, str(_p / "shared"))
 
+import branding
 import report_common as rc
 
 st.set_page_config(page_title="Security & Horizon Governance Report", layout="wide")
@@ -112,6 +113,7 @@ def load_security_data():
 
 
 data = load_security_data()
+data["logo_b64"] = branding.LOGO_B64
 if data["security"]["login_daily"]:
     data["period_start"] = min(r["date"] for r in data["security"]["login_daily"])
     data["period_end"] = max(r["date"] for r in data["security"]["login_daily"])
