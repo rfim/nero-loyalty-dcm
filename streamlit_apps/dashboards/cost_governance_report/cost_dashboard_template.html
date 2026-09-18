@@ -169,6 +169,13 @@
     <div class="note-block" id="warehouseUserNote"></div>
   </section>
 
+  <section class="doc-section">
+    <span class="section-num">5.</span><span class="section-title">Monthly spend &amp; estimate</span>
+    <p class="section-sub">Whole-account compute (warehouses + Cortex) by calendar month. The current month's bar is split into actual-so-far and a linear projection to month end, same method as the month-to-date forecast above.</p>
+    <svg id="chartMonthly" class="barchart"></svg>
+    <div class="tbl-wrap"><table class="datatable" id="monthlyTable"></table></div>
+  </section>
+
   <footer>
     <p>Sources: SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY, .QUERY_HISTORY, .CORTEX_*_USAGE_HISTORY, SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY, wrapped by NERO_GOVERNANCE.COST. ACCOUNT_USAGE carries replication latency of up to a few hours.</p>
   </footer>
@@ -309,6 +316,33 @@ document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi${k.
     ct.innerHTML = `<thead><tr><th>Source</th><th>Credits</th><th>Tokens</th><th>Requests</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td class="name">${r.source}</td><td>${fmtCredits(r.credits)}</td><td>${fmtInt(r.tokens)}</td><td>${fmtInt(r.requests)}</td></tr>`).join('')}</tbody>`;
   }
+})();
+
+(function () {
+  const rows = DATA.cost.monthly_breakdown;
+  const mt = document.getElementById('monthlyTable');
+  if (rows.length === 0) {
+    document.getElementById('chartMonthly').outerHTML = '<p style="color:var(--ink-muted)">No usage history yet.</p>';
+    mt.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No data.</td></tr></tbody>';
+    return;
+  }
+  const actualColor = getComputedStyle(document.documentElement).getPropertyValue('--series-1').trim();
+  const projectedColor = getComputedStyle(document.documentElement).getPropertyValue('--series-3').trim();
+  const groups = rows.map(m => ({
+    label: m.month_label.slice(0, 3), month_label: m.month_label, is_current: m.is_current,
+    actual: m.actual_usd, projected: m.is_current ? Math.max(m.estimated_usd - m.actual_usd, 0) : 0,
+  }));
+  renderStackedBarChart(document.getElementById('chartMonthly'), groups, ['actual', 'projected'],
+    { actual: actualColor, projected: projectedColor }, {
+      tipRows: (g, k) => k === 'actual'
+        ? `<div class="t-title">${g.month_label}</div><div class="t-row"><span>Actual${g.is_current ? ' so far' : ''}</span><b>${fmtUsd(g.actual)}</b></div>`
+        : `<div class="t-title">${g.month_label}</div><div class="t-row"><span>Projected remainder</span><b>${fmtUsd(g.projected)}</b></div><div class="t-row"><span>Projected total</span><b>${fmtUsd(g.actual + g.projected)}</b></div>`,
+    });
+  document.getElementById('chartMonthly').insertAdjacentHTML('beforebegin',
+    `<div class="legend"><span class="sw"><span class="dot" style="background:${actualColor}"></span>Actual</span><span class="sw"><span class="dot" style="background:${projectedColor}"></span>Projected remainder (current month)</span></div>`);
+
+  mt.innerHTML = `<thead><tr><th>Month</th><th>Credits</th><th>Actual USD</th><th>Projected month-end</th><th>Status</th></tr></thead>
+    <tbody>${rows.map(m => `<tr><td class="name">${m.month_label}</td><td>${fmtCredits(m.actual_credits)}</td><td>${fmtUsd(m.actual_usd)}</td><td>${m.is_current ? fmtUsd(m.estimated_usd) : '—'}</td><td>${m.is_current ? 'In progress' : 'Complete'}</td></tr>`).join('')}</tbody>`;
 })();
 
 (function () {
