@@ -3,20 +3,68 @@
 -- Edit the contract and rerun `python ingestion/build.py` instead.
 -- =============================================================================
 
-DEFINE FILE FORMAT NERO_DB."00_BRONZE".JSON_LINES
-    TYPE = JSON
-    STRIP_OUTER_ARRAY = FALSE
-    COMMENT = 'One JSON object per line (manifest or record envelope).';
-
 DEFINE STAGE NERO_DB."00_BRONZE".LANDING_STAGE
-    FILE_FORMAT = NERO_DB."00_BRONZE".JSON_LINES
-    COMMENT = 'Credential-free internal stage for manual/CI batch uploads.';
+    COMMENT = 'Credential-free internal stage for manual/CI batch uploads (typed per-dataset CSVs, one file per dataset per batch).';
 
-DEFINE TABLE NERO_DB."00_BRONZE".RAW_ENVELOPES (
-    PAYLOAD          VARCHAR       NOT NULL,
-    FILE_NAME        VARCHAR,
-    FILE_ROW_NUMBER  NUMBER,
-    FILE_CONTENT_KEY VARCHAR,
-    INGESTED_AT      TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP()
+DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_CUSTOMERS (
+    CUSTOMER_ID          NUMBER,
+    SIGNUP_DATE          DATE,
+    TIER                 VARCHAR(16777216),
+    HOME_STORE_ID        NUMBER,
+    BATCH_ID             VARCHAR(200) NOT NULL,
+    FILE_ROW_NUMBER      NUMBER       NOT NULL,
+    INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'Raw landing table. One row per JSON line loaded from LANDING_STAGE via COPY INTO. Batches are identified by FILE_NAME.';
+COMMENT = 'Typed bronze landing for loyalty_customers, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+
+DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_EVENTS (
+    EVENT_ID             NUMBER,
+    CUSTOMER_ID          NUMBER,
+    EVENT_TS             TIMESTAMP_TZ,
+    EVENT_TYPE           VARCHAR(16777216),
+    REWARD_ID            NUMBER,
+    STORE_ID             NUMBER,
+    BATCH_ID             VARCHAR(200) NOT NULL,
+    FILE_ROW_NUMBER      NUMBER       NOT NULL,
+    INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Typed bronze landing for loyalty_events, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+
+DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_STORES (
+    STORE_ID             NUMBER,
+    STORE_NAME           VARCHAR(200),
+    REGION               VARCHAR(100),
+    FORMAT               VARCHAR(16777216),
+    OPENED_DATE          DATE,
+    BATCH_ID             VARCHAR(200) NOT NULL,
+    FILE_ROW_NUMBER      NUMBER       NOT NULL,
+    INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Typed bronze landing for stores, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+
+DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_TRANSACTIONS (
+    TRANSACTION_ID       NUMBER,
+    STORE_ID             NUMBER,
+    TRANSACTION_TS       TIMESTAMP_TZ,
+    CUSTOMER_ID          NUMBER,
+    BASKET_TOTAL         NUMBER(8,2),
+    ITEM_COUNT           NUMBER,
+    PAYMENT_TYPE         VARCHAR(16777216),
+    BATCH_ID             VARCHAR(200) NOT NULL,
+    FILE_ROW_NUMBER      NUMBER       NOT NULL,
+    INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Typed bronze landing for transactions, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+
+DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS (
+    BATCH_ID          VARCHAR(200)  NOT NULL,
+    CONTRACT_ID       VARCHAR(200)  NOT NULL,
+    CONTRACT_VERSION  NUMBER        NOT NULL,
+    CONTRACT_HASH     VARCHAR(64)   NOT NULL,
+    SOURCE_SYSTEM     VARCHAR(200),
+    CAPTURED_AT       TIMESTAMP_TZ  NOT NULL,
+    DATASETS          VARIANT       NOT NULL,
+    INGESTED_AT       TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),
+    PRIMARY KEY (BATCH_ID)
+)
+COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count, load_mode, watermark_value} in DATASETS. PROCESS_BATCH reads this instead of a manifest-type envelope row.';

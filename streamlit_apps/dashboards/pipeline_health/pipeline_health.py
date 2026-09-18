@@ -62,9 +62,13 @@ def one(sql: str):
 def load_pipeline_data():
     pointer = one('SELECT CURRENT_BATCH_ID, CURRENT_RELEASE_AT FROM NERO_DB."02_CONTROL".CONTROL_RELEASE_POINTER')
 
+    bronze_count = sum(
+        one(f'SELECT COUNT(*) AS N FROM NERO_DB."00_BRONZE".BRONZE_{ds}')["N"]
+        for ds in ("STORES", "TRANSACTIONS", "LOYALTY_EVENTS", "LOYALTY_CUSTOMERS")
+    )
     layers = [
-        {"layer": "Raw landing (Bronze)", "object": "RAW_ENVELOPES",
-         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."00_BRONZE".RAW_ENVELOPES')["N"]},
+        {"layer": "Raw landing (Bronze)", "object": "BRONZE_<DATASET> (4 tables)",
+         "count": bronze_count},
         {"layer": "Validated (Silver)", "object": "VALIDATED_STORES",
          "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_SILVER".VALIDATED_STORES')["N"]},
         {"layer": "Validated (Silver)", "object": "VALIDATED_LOYALTY_CUSTOMERS",

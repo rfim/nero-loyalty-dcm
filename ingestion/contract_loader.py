@@ -21,7 +21,7 @@ ALLOWED = {
     "meta": {"version", "contract_id", "wire_format", "ingestion", "freshness"},
     "ingestion": {"source", "landing"},
     "source": {"type", "file_pattern", "on_error", "internal_stage", "s3"},
-    "landing": {"type", "table_name", "iceberg"},
+    "landing": {"type", "manifest_table_name", "dataset_table_prefix", "iceberg"},
     "dataset": {"primary_key", "owners", "columns", "policies"},
     "column": {"type", "nullable", "max_length", "enum", "foreign_key", "precision", "scale",
                "pii", "pii_kind", "example"},

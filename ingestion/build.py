@@ -83,38 +83,62 @@ def gen_raw_landing(doc):
         "-- Edit the contract and rerun `python ingestion/build.py` instead.",
         "-- =============================================================================",
         "",
-        f"DEFINE FILE FORMAT {BRONZE}.JSON_LINES",
-        "    TYPE = JSON",
-        "    STRIP_OUTER_ARRAY = FALSE",
-        "    COMMENT = 'One JSON object per line (manifest or record envelope).';",
-        "",
     ]
     if source["type"] == "internal_stage":
         lines += [
             f"DEFINE STAGE {BRONZE}.LANDING_STAGE",
-            f"    FILE_FORMAT = {BRONZE}.JSON_LINES",
-            "    COMMENT = 'Credential-free internal stage for manual/CI batch uploads.';",
+            "    COMMENT = 'Credential-free internal stage for manual/CI batch uploads (typed per-dataset CSVs, one file per dataset per batch).';",
             "",
         ]
     else:
         sys.exit(f"build.py: source.type '{source['type']}' has no deployed definition here — "
                   f"see ingestion/reference/s3.sql for the (unverified) s3 route.")
 
-    if landing["type"] == "native":
+    if landing["type"] == "typed":
+        # One typed table per contract dataset -- readable by design (real
+        # columns, not a JSON blob), landed directly by each adapter or via
+        # COPY INTO from a per-dataset staged CSV. Columns are nullable
+        # regardless of the contract's own nullable flag: bronze's job is to
+        # preserve whatever arrived, including invalid rows, so PROCESS_BATCH
+        # can give a precise "row N: col is required but null" message
+        # instead of the INSERT itself opaquely failing. NOT_NULL is enforced
+        # downstream, on VALIDATED_<DATASET> (see gen_validated_tables).
+        for ds_name, ds in doc["datasets"].items():
+            table = f"{landing['dataset_table_prefix']}{ds_name.upper()}"
+            col_lines = []
+            for col_name, col in ds["columns"].items():
+                sql_type = sql_column_type(col_name, col, f"datasets.{ds_name}.columns.{col_name}")
+                col_lines.append(f"    {col_name.upper():<20} {sql_type},")
+            col_lines += [
+                "    BATCH_ID             VARCHAR(200) NOT NULL,",
+                "    FILE_ROW_NUMBER      NUMBER       NOT NULL,",
+                "    INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()",
+            ]
+            lines.append(f"DEFINE TABLE {table} (")
+            lines += col_lines
+            lines.append(")")
+            contract_version = doc["version"]
+            lines.append(f"COMMENT = 'Typed bronze landing for {ds_name}, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v{contract_version}.';")
+            lines.append("")
+
         lines += [
-            f"DEFINE TABLE {landing['table_name']} (",
-            "    PAYLOAD          VARCHAR       NOT NULL,",
-            "    FILE_NAME        VARCHAR,",
-            "    FILE_ROW_NUMBER  NUMBER,",
-            "    FILE_CONTENT_KEY VARCHAR,",
-            "    INGESTED_AT      TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP()",
+            f"DEFINE TABLE {landing['manifest_table_name']} (",
+            "    BATCH_ID          VARCHAR(200)  NOT NULL,",
+            "    CONTRACT_ID       VARCHAR(200)  NOT NULL,",
+            "    CONTRACT_VERSION  NUMBER        NOT NULL,",
+            "    CONTRACT_HASH     VARCHAR(64)   NOT NULL,",
+            "    SOURCE_SYSTEM     VARCHAR(200),",
+            "    CAPTURED_AT       TIMESTAMP_TZ  NOT NULL,",
+            "    DATASETS          VARIANT       NOT NULL,",
+            "    INGESTED_AT       TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),",
+            "    PRIMARY KEY (BATCH_ID)",
             ")",
-            "COMMENT = 'Raw landing table. One row per JSON line loaded from LANDING_STAGE via COPY INTO. Batches are identified by FILE_NAME.';",
+            "COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count, load_mode, watermark_value} in DATASETS. PROCESS_BATCH reads this instead of a manifest-type envelope row.';",
         ]
     elif landing["type"] == "iceberg":
         iceberg = landing["iceberg"]
         lines += [
-            f"DEFINE ICEBERG TABLE {landing['table_name']} (",
+            f"DEFINE ICEBERG TABLE {landing['manifest_table_name']} (",
             "    PAYLOAD          VARCHAR       NOT NULL,",
             "    FILE_NAME        VARCHAR,",
             "    FILE_ROW_NUMBER  NUMBER,",
@@ -274,11 +298,20 @@ def gen_masking_reference(doc):
 
 def gen_s3_reference(doc):
     s3 = doc["ingestion"]["source"]["s3"]
-    landing = doc["ingestion"]["landing"]
     lines = [
         "-- UNVERIFIED — reference only, not deployed by DCM (lives outside sources/definitions).",
         "-- No live AWS credentials in this account to test this route. Replace the",
         "-- REPLACE_* placeholders and move into sources/definitions/ once validated.",
+        "--",
+        "-- Under landing.type=typed (per-dataset bronze tables, not one shared",
+        "-- envelope table), a single auto-ingest PIPE can no longer target 'the",
+        "-- landing table' generically -- each dataset's CSV would need its own",
+        "-- pipe (one COPY INTO per BRONZE_<DATASET>, keyed by a file naming",
+        "-- convention like <dataset>/<batch_id>.csv) plus a separate insert into",
+        "-- BRONZE_BATCH_MANIFESTS once all of a batch's files have landed. That's",
+        "-- a real design, not sketched here since there's no live S3 bucket to",
+        "-- validate it against -- left as the next step if a real S3 source is",
+        "-- ever added.",
         "",
         f"CREATE STORAGE INTEGRATION IF NOT EXISTS {s3['integration_name']}",
         "    TYPE = EXTERNAL_STAGE",
@@ -289,27 +322,8 @@ def gen_s3_reference(doc):
         "",
         f"CREATE STAGE IF NOT EXISTS {s3['stage_name']}",
         f"    URL = '{s3['bucket_url']}'",
-        f"    STORAGE_INTEGRATION = {s3['integration_name']}",
-        f"    FILE_FORMAT = {BRONZE}.JSON_LINES;",
+        f"    STORAGE_INTEGRATION = {s3['integration_name']};",
     ]
-    if s3.get("auto_ingest"):
-        lines += [
-            "",
-            f"CREATE PIPE IF NOT EXISTS {s3['pipe_name']}",
-            "    AUTO_INGEST = TRUE",
-            "AS",
-            f"COPY INTO {landing['table_name']}",
-            "    (PAYLOAD, FILE_NAME, FILE_ROW_NUMBER, FILE_CONTENT_KEY, INGESTED_AT)",
-            "FROM (",
-            "    SELECT",
-            "        TO_JSON($1), METADATA$FILENAME, METADATA$FILE_ROW_NUMBER,",
-            "        METADATA$FILE_CONTENT_KEY, METADATA$START_SCAN_TIME",
-            f"    FROM @{s3['stage_name']}",
-            ")",
-            f"FILE_FORMAT = (FORMAT_NAME = {BRONZE}.JSON_LINES)",
-            f"PATTERN = '{doc['ingestion']['source']['file_pattern']}'",
-            "ON_ERROR = 'SKIP_FILE';",
-        ]
     return "\n".join(lines) + "\n"
 
 
@@ -362,14 +376,17 @@ def seed_lineage(doc):
     PII registry — this always reflects the current contract + known dbt
     layer, not an append-only history."""
     rows = [
-        ("NERO_DB", '00_BRONZE', "RAW_ENVELOPES", "bronze", None,
-         "Raw JSON envelopes for all datasets, unvalidated."),
+        ("NERO_DB", '00_BRONZE', "BRONZE_BATCH_MANIFESTS", "bronze", None,
+         "One row per submitted batch: contract pin + per-dataset row_count/load_mode/watermark_value."),
     ]
     for ds_name in doc["datasets"]:
         upper = ds_name.upper()
         rows += [
+            ("NERO_DB", '00_BRONZE', f"BRONZE_{upper}", "bronze",
+             "NERO_DB.00_BRONZE.BRONZE_BATCH_MANIFESTS",
+             f"Typed, unvalidated landing for {ds_name}. One row per record, real columns, no JSON."),
             ("NERO_DB", '01_SILVER', f"VALIDATED_{upper}", "silver",
-             "NERO_DB.00_BRONZE.RAW_ENVELOPES -> NERO_DB.02_CONTROL.PROCESS_BATCH",
+             f"NERO_DB.00_BRONZE.BRONZE_{upper} -> NERO_DB.02_CONTROL.PROCESS_BATCH",
              f"Contract-validated {ds_name}, written by PROCESS_BATCH on publish."),
             ("NERO_ANALYTICS", '00_STAGING', f"STG_{upper}", "dbt_staging",
              f"NERO_DB.01_SILVER.VALIDATED_{upper}",
