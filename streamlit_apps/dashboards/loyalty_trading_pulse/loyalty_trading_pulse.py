@@ -19,6 +19,15 @@ import streamlit as st
 import streamlit.components.v1 as components
 from snowflake.snowpark.context import get_active_session
 
+import sys as _sys
+from pathlib import Path as _Path
+_p = _Path(__file__).resolve().parent
+while not (_p / "shared").is_dir() and _p != _p.parent:
+    _p = _p.parent
+_sys.path.insert(0, str(_p / "shared"))
+
+import branding
+
 st.set_page_config(page_title="Loyalty & Trading Pulse", layout="wide")
 
 session = get_active_session()
@@ -178,6 +187,7 @@ def load_dashboard_data():
 
 
 data = load_dashboard_data()
+data["logo_b64"] = branding.LOGO_B64
 
 template_path = Path(__file__).parent / "dashboard_template.html"
 html = template_path.read_text().replace("__DATA_JSON__", json.dumps(data))

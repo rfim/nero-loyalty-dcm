@@ -23,6 +23,7 @@ while not (_p / "shared").is_dir() and _p != _p.parent:
     _p = _p.parent
 _sys.path.insert(0, str(_p / "shared"))
 
+import branding
 import report_common as rc
 
 st.set_page_config(page_title="Cost Governance Report", layout="wide")
@@ -175,6 +176,7 @@ def load_cost_data():
 
 
 data = load_cost_data()
+data["logo_b64"] = branding.LOGO_B64
 
 template_path = Path(__file__).parent / "cost_dashboard_template.html"
 html = template_path.read_text().replace("__DATA_JSON__", json.dumps(data))
