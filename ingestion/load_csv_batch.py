@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """One-off (but reusable) loader: converts the original 4 source CSVs
 (stores.csv, loyalty_customers.csv, transactions.csv, loyalty_events.csv)
-into one nero_snapshot_v2 batch, uploads it, and calls PROCESS_BATCH.
+into one batch, lands each dataset directly into its typed BRONZE_<DATASET>
+table plus one BRONZE_BATCH_MANIFESTS row, and calls PROCESS_BATCH.
 
 Naive timestamps in transactions.csv/loyalty_events.csv are localized to
-Europe/London (the plan's own recommendation) before being emitted as
-TIMESTAMP_TZ-parseable ISO strings — PROCESS_BATCH's generic parser has
-no concept of "assume local time for naive timestamps", so that
-localization has to happen here, at the point the wire-format envelope
-is built.
+Europe/London (the plan's own recommendation) before landing -- bronze
+columns are TIMESTAMP_TZ, so this has to happen here, at the point values
+are cast to their target type, same as before.
+
+Values are staged locally as one CSV per dataset and landed via COPY INTO
+BRONZE_<DATASET> (through LANDING_STAGE, same credential-free internal
+stage as always) -- not row-by-row INSERTs, so this scales the same way
+the original JSONL-based loader did for the full 49k-row transactions file.
 
 Usage: python ingestion/load_csv_batch.py --csv-dir <dir> -c <connection> [--batch-id <id>]
 """
@@ -35,23 +39,18 @@ DATASET_FILES = {
 }
 
 
-def envelope(**kwargs):
-    return json.dumps(kwargs, default=str)
-
-
 def coerce_value(raw, col_type):
     if raw == "" or raw is None:
         return None
     if col_type == "integer":
         return int(raw)
     if col_type == "decimal":
-        return raw  # keep as string, contract parser handles decimal strings
-    if col_type in ("date",):
-        return raw
+        return float(raw)
+    if col_type == "date":
+        return raw  # already YYYY-MM-DD, COPY INTO's DATE_FORMAT=AUTO parses it
     if col_type == "timestamp_tz":
         naive = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
-        localized = naive.replace(tzinfo=LONDON)
-        return localized.isoformat()
+        return naive.replace(tzinfo=LONDON).isoformat()
     return raw
 
 
@@ -69,6 +68,48 @@ def read_dataset(csv_dir, ds_name, ds_spec):
     return rows
 
 
+def write_staged_csv(rows, columns, batch_id, out_path):
+    with open(out_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        for i, values in enumerate(rows, start=1):
+            row = [values.get(c) if values.get(c) is not None else "" for c in columns]
+            row += [batch_id, i]
+            writer.writerow(row)
+
+
+def land_dataset(connection, ds_name, ds_spec, rows, batch_id, tmp_dir):
+    if not rows:
+        return
+    columns = list(ds_spec["columns"].keys())
+    local_path = tmp_dir / f"{batch_id}_{ds_name}.csv"
+    write_staged_csv(rows, columns, batch_id, local_path)
+
+    subprocess.run(["snow", "stage", "copy", str(local_path),
+                     '@NERO_DB."00_BRONZE".LANDING_STAGE', "--overwrite", "-c", connection], check=True)
+
+    col_list = ", ".join(c.upper() for c in columns) + ", BATCH_ID, FILE_ROW_NUMBER"
+    table = f'NERO_DB."00_BRONZE".BRONZE_{ds_name.upper()}'
+    copy_sql = f"""
+    COPY INTO {table} ({col_list})
+    FROM @NERO_DB."00_BRONZE".LANDING_STAGE
+    FILES = ('{local_path.name}')
+    FILE_FORMAT = (TYPE = CSV EMPTY_FIELD_AS_NULL = TRUE)
+    ON_ERROR = 'ABORT_STATEMENT';
+    """
+    subprocess.run(["snow", "sql", "-c", connection, "-q", copy_sql], check=True)
+
+
+def insert_manifest(connection, batch_id, contract, contract_hash, dataset_rows, captured_at):
+    datasets_json = json.dumps({name: {"row_count": len(rows)} for name, rows in dataset_rows.items()})
+    sql = f"""
+    INSERT INTO NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS
+        (BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS)
+    SELECT '{batch_id}', '{contract["contract_id"]}', {contract["version"]}, '{contract_hash}',
+        'csv_archive_upload', '{captured_at}', PARSE_JSON($${datasets_json}$$);
+    """
+    subprocess.run(["snow", "sql", "-c", connection, "-q", sql], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv-dir", required=True, help="directory containing the 4 source CSVs")
@@ -78,46 +119,30 @@ def main():
 
     doc, contract_hash = load_contract()
     batch_id = args.batch_id or f"csv_load_{int(time.time())}"
-    captured_at = datetime.now(timezone.utc).isoformat()
+    # From Snowflake's own clock, not this machine's -- the release-pointer
+    # gate compares captured_at against Snowflake's CURRENT_TIMESTAMP(), and
+    # a stored proc under EXTERNAL_ACCESS_INTEGRATIONS was observed live
+    # running ~14 hours ahead of it (see account_setup/google_sheets_ingest.sql).
+    # This script's own clock proved accurate, but sourcing captured_at from
+    # the same clock the gate compares against is the only version of this
+    # that can never drift relative to it.
+    captured_at_result = subprocess.run(
+        ["snow", "sql", "-c", args.connection, "--format", "JSON", "-q", "SELECT CURRENT_TIMESTAMP() AS NOW;"],
+        check=True, capture_output=True, text=True,
+    )
+    captured_at = json.loads(captured_at_result.stdout)[0]["NOW"]
 
     dataset_rows = {
         ds_name: read_dataset(args.csv_dir, ds_name, ds_spec)
         for ds_name, ds_spec in doc["datasets"].items()
     }
 
-    lines = [envelope(
-        type="manifest", batch_id=batch_id,
-        contract_id=doc["contract_id"], contract_version=doc["version"],
-        contract_hash=contract_hash, source_system="csv_archive_upload",
-        captured_at=captured_at,
-        datasets={name: {"row_count": len(rows)} for name, rows in dataset_rows.items()},
-    )]
-    for ds_name, rows in dataset_rows.items():
-        for i, values in enumerate(rows, start=1):
-            lines.append(envelope(
-                type="record", batch_id=batch_id, dataset=ds_name,
-                row_number=i, values=values, metadata={},
-            ))
-        print(f"{ds_name}: {len(rows)} rows")
+    tmp_dir = Path("/tmp")
+    for ds_name, ds_spec in doc["datasets"].items():
+        land_dataset(args.connection, ds_name, ds_spec, dataset_rows[ds_name], batch_id, tmp_dir)
+        print(f"{ds_name}: {len(dataset_rows[ds_name])} rows landed")
 
-    local_path = Path(f"/tmp/{batch_id}.jsonl")
-    local_path.write_text("\n".join(lines) + "\n")
-    print(f"Wrote {len(lines)} lines ({local_path.stat().st_size:,} bytes) to {local_path}")
-
-    subprocess.run(["snow", "stage", "copy", str(local_path),
-                     '@NERO_DB."00_BRONZE".LANDING_STAGE', "--overwrite", "-c", args.connection], check=True)
-
-    copy_sql = f"""
-    COPY INTO NERO_DB."00_BRONZE".RAW_ENVELOPES (PAYLOAD, FILE_NAME, FILE_ROW_NUMBER, FILE_CONTENT_KEY)
-    FROM (
-        SELECT TO_JSON($1), METADATA$FILENAME, METADATA$FILE_ROW_NUMBER, METADATA$FILE_CONTENT_KEY
-        FROM @NERO_DB."00_BRONZE".LANDING_STAGE
-    )
-    FILES = ('{batch_id}.jsonl')
-    FILE_FORMAT = (FORMAT_NAME = NERO_DB."00_BRONZE".JSON_LINES)
-    ON_ERROR = 'ABORT_STATEMENT';
-    """
-    subprocess.run(["snow", "sql", "-c", args.connection, "-q", copy_sql], check=True)
+    insert_manifest(args.connection, batch_id, doc, contract_hash, dataset_rows, captured_at)
 
     call_sql = f'CALL NERO_DB."02_CONTROL".PROCESS_BATCH(\'{batch_id}\');'
     result = subprocess.run(["snow", "sql", "-c", args.connection, "--format", "JSON", "-q", call_sql],

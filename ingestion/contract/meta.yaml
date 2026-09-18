@@ -1,13 +1,15 @@
-version: 4
+version: 5
 contract_id: nero_loyalty_contract
 wire_format: nero_snapshot_v2
 
 # Platform-level ingestion config, merged in from the guide's separate
-# deployment.yaml. Shared across all datasets — they all land in one
-# RAW_ENVELOPES table via one stage. Only source.type=internal_stage +
-# landing.type=native is deployed/tested — the s3 block is schema-valid and
-# the generator emits real SQL for it, but it's UNVERIFIED (no live AWS
-# credentials in this account).
+# deployment.yaml. landing.type=typed lands each dataset in its own typed
+# BRONZE_<DATASET> table (columns/types generated straight from this
+# contract, same as VALIDATED_<DATASET>) plus one BRONZE_BATCH_MANIFESTS
+# table carrying batch-level metadata -- readable by design, not a shared
+# JSON envelope table. Only source.type=internal_stage is deployed/tested --
+# the s3 block is schema-valid and the generator emits real SQL for it, but
+# it's UNVERIFIED (no live AWS credentials in this account).
 #
 # NERO_DB is split into numbered schemas by pipeline stage (see
 # ingestion/build.py's schema constants) — bronze objects below live in
@@ -16,7 +18,7 @@ wire_format: nero_snapshot_v2
 ingestion:
   source:
     type: internal_stage          # internal_stage | s3
-    file_pattern: ".*[.]jsonl"
+    file_pattern: ".*[.]csv"
     on_error: ABORT_STATEMENT
     internal_stage:
       stage_name: 'NERO_DB."00_BRONZE".LANDING_STAGE'
@@ -28,8 +30,9 @@ ingestion:
       auto_ingest: true
       pipe_name: 'NERO_DB."00_BRONZE".CONTRACT_PIPE'
   landing:
-    type: native                  # native | iceberg
-    table_name: 'NERO_DB."00_BRONZE".RAW_ENVELOPES'
+    type: typed                   # typed | iceberg
+    manifest_table_name: 'NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS'
+    dataset_table_prefix: 'NERO_DB."00_BRONZE".BRONZE_'
     iceberg:
       external_volume: SNOWFLAKE_MANAGED
       base_location: nero/raw/envelopes

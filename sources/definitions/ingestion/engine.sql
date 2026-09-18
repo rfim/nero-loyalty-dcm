@@ -3,9 +3,10 @@
 -- Database: NERO_DB  Schema: NERO_LOYALTY
 --
 -- Everything hand-written about the ingestion pipeline: control tables, the
--- frozen-batch work table, the gate task, and PROCESS_BATCH/RUN_PENDING.
--- RAW_ENVELOPES and VALIDATED_* are GENERATED from ingestion/contract.yaml —
--- see raw.sql and validated.sql (run `python ingestion/build.py` to rebuild).
+-- gate task, and PROCESS_BATCH/RUN_PENDING. BRONZE_<DATASET>,
+-- BRONZE_BATCH_MANIFESTS, and VALIDATED_* are GENERATED from
+-- ingestion/contract/ — see raw.sql and validated.sql (run
+-- `python ingestion/build.py` to rebuild).
 -- =============================================================================
 
 -- =========================== CONTROL TABLES =================================
@@ -38,15 +39,14 @@ DEFINE TABLE NERO_DB."02_CONTROL".CONTROL_RELEASE_POINTER (
 )
 COMMENT = 'Compare-and-set pointer to the currently published batch. Reporting views join on this to expose only the approved release.';
 
--- ============================ WORK TABLE ====================================
-
-DEFINE TABLE NERO_DB."02_CONTROL".WORK_ENVELOPES (
-    RUN_ID       VARCHAR(200)  NOT NULL,
-    BATCH_ID     VARCHAR(200)  NOT NULL,
-    DOC          VARIANT       NOT NULL,
-    FROZEN_AT    TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP()
+DEFINE TABLE NERO_DB."02_CONTROL".CONTROL_INGEST_WATERMARKS (
+    DATASET         VARCHAR(100)  NOT NULL,
+    SOURCE_SYSTEM   VARCHAR(100)  NOT NULL,
+    LAST_WATERMARK  VARCHAR(200),
+    UPDATED_AT      TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),
+    PRIMARY KEY (DATASET, SOURCE_SYSTEM)
 )
-COMMENT = 'Frozen snapshot of one batch''s raw envelopes for a single PROCESS_BATCH run. Written by one INSERT...SELECT so all downstream checks read the same fixed set. Cleared after normal runs.';
+COMMENT = 'High-watermark per (dataset, source_system), advanced only after PROCESS_BATCH publishes an incremental batch for that dataset. Read by incremental adapters to know what "new since last time" means; full-load datasets never touch this table.';
 
 -- ============================= GATE TASK ====================================
 -- Suspended by default (DCM default) — resume explicitly once smoke tests
@@ -66,6 +66,17 @@ AS
 -- keys, and the reward_id-required-on-redeem policy. Not implemented (scope
 -- narrowed vs. the source guide): string-length-by-byte edge cases, offset-
 -- bearing timestamp normalisation beyond ISO parsing, file-content-key dedup.
+--
+-- Per-dataset load_mode (declared per dataset in the manifest, defaulting
+-- to "full" when absent -- every adapter written before this stays
+-- unchanged): "full" is the original DELETE+reload of the whole
+-- VALIDATED_* table; "incremental" instead MERGEs the batch's rows in by
+-- primary key and advances CONTROL_INGEST_WATERMARKS. A batch can mix
+-- modes across its datasets -- row-count/contiguity and FK checks above
+-- need no per-mode branching, since FK resolution already only looks at
+-- whatever's present in id_pools for the *referenced* dataset, and every
+-- adapter so far always sends full-mode datasets in full regardless of
+-- what else is in the same batch.
 
 DEFINE PROCEDURE NERO_DB."02_CONTROL".PROCESS_BATCH(BATCH_ID VARCHAR)
 RETURNS VARIANT
@@ -79,9 +90,10 @@ $$
 import json
 import uuid
 from datetime import datetime, date
+from decimal import Decimal
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
 POINTER_NAME = "LOYALTY_SNAPSHOT"
 
 
@@ -92,6 +104,10 @@ def _validated_table(dataset_name: str) -> str:
     return f"NERO_DB.\"01_SILVER\".VALIDATED_{dataset_name.upper()}"
 
 
+def _bronze_table(dataset_name: str) -> str:
+    return f"NERO_DB.\"00_BRONZE\".BRONZE_{dataset_name.upper()}"
+
+
 def _audit(session, batch_id, run_id, status, details):
     session.sql(
         "INSERT INTO NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT "
@@ -99,23 +115,6 @@ def _audit(session, batch_id, run_id, status, details):
         params=[batch_id, run_id, status, json.dumps(details, default=str)],
     ).collect()
     return {"batch_id": batch_id, "run_id": run_id, "status": status, "details": details}
-
-
-def _parse_scalar(col_type, raw):
-    if raw is None:
-        return None, None
-    try:
-        if col_type == "integer":
-            return int(raw), None
-        if col_type == "decimal":
-            return float(raw), None
-        if col_type in ("date",):
-            return date.fromisoformat(str(raw)[:10]), None
-        if col_type in ("timestamp_tz",):
-            return datetime.fromisoformat(str(raw).replace("Z", "+00:00")), None
-        return str(raw), None
-    except Exception as e:
-        return None, f"cannot parse '{raw}' as {col_type}: {e}"
 
 
 def run(session, batch_id: str) -> dict:
@@ -130,30 +129,22 @@ def run(session, batch_id: str) -> dict:
 
     run_id = f"{batch_id}_{uuid.uuid4().hex[:8]}"
 
-    # Freeze this batch's envelopes into WORK in one INSERT...SELECT.
-    session.sql(
-        "INSERT INTO NERO_DB.\"02_CONTROL\".WORK_ENVELOPES (RUN_ID, BATCH_ID, DOC) "
-        "SELECT DISTINCT ?, ?, PARSE_JSON(PAYLOAD) "
-        "FROM NERO_DB.\"00_BRONZE\".RAW_ENVELOPES "
-        "WHERE PARSE_JSON(PAYLOAD):batch_id::string = ?",
-        params=[run_id, batch_id, batch_id],
+    # Bronze is now typed per-dataset tables (BRONZE_<DATASET>) plus one
+    # BRONZE_BATCH_MANIFESTS row per batch -- no more WORK_ENVELOPES freeze
+    # needed: rows are already scoped and immutable by BATCH_ID the moment
+    # an adapter lands them, so a plain WHERE BATCH_ID = ? read is already
+    # stable for the duration of this run.
+    manifest_rows = session.sql(
+        "SELECT CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS "
+        "FROM NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS WHERE BATCH_ID = ?",
+        params=[batch_id],
     ).collect()
-
-    rows = session.sql(
-        "SELECT DOC FROM NERO_DB.\"02_CONTROL\".WORK_ENVELOPES WHERE RUN_ID = ?",
-        params=[run_id],
-    ).collect()
-    docs = [json.loads(r["DOC"]) if isinstance(r["DOC"], str) else r["DOC"] for r in rows]
-
-    manifests = [d for d in docs if d.get("type") == "manifest"]
-    records = [d for d in docs if d.get("type") == "record"]
-
-    if len(manifests) != 1:
+    if len(manifest_rows) != 1:
         return _audit(session, batch_id, run_id, "ERROR",
-                       {"reason": f"expected exactly 1 manifest, found {len(manifests)}"})
+                       {"reason": f"expected exactly 1 manifest, found {len(manifest_rows)}"})
 
-    manifest = manifests[0]
-    if manifest.get("contract_id") != CONTRACT_ID or manifest.get("contract_version") != CONTRACT_VERSION:
+    m = manifest_rows[0]
+    if m["CONTRACT_ID"] != CONTRACT_ID or m["CONTRACT_VERSION"] != CONTRACT_VERSION:
         return _audit(session, batch_id, run_id, "REJECTED",
                        {"reason": "manifest references an unpinned contract_id/version"})
 
@@ -164,29 +155,39 @@ def run(session, batch_id: str) -> dict:
     ).collect()
     if not pinned:
         return _audit(session, batch_id, run_id, "ERROR", {"reason": "pinned contract not seeded in CONTROL_DATA_CONTRACTS"})
-    if manifest.get("contract_hash") != pinned[0]["CONTRACT_HASH"]:
+    if m["CONTRACT_HASH"] != pinned[0]["CONTRACT_HASH"]:
         return _audit(session, batch_id, run_id, "REJECTED", {"reason": "manifest contract_hash does not match pinned hash"})
 
     contract = json.loads(pinned[0]["CONTRACT_JSON"]) if isinstance(pinned[0]["CONTRACT_JSON"], str) else pinned[0]["CONTRACT_JSON"]
     dataset_specs = contract["datasets"]
 
-    declared = manifest.get("datasets", {})
+    declared = json.loads(m["DATASETS"]) if isinstance(m["DATASETS"], str) else m["DATASETS"]
     if set(declared.keys()) != set(dataset_specs.keys()):
         return _audit(session, batch_id, run_id, "REJECTED",
                        {"reason": "manifest dataset headers do not match contract datasets",
                         "declared": list(declared.keys()), "expected": list(dataset_specs.keys())})
 
-    by_dataset = {name: [] for name in dataset_specs}
-    for r in records:
-        ds = r.get("dataset")
-        if ds in by_dataset:
-            by_dataset[ds].append(r)
+    # Pull each dataset's bronze rows for this batch. Columns come back
+    # already typed by Snowflake (the bronze table's own column types), so
+    # there's no more "does this string parse as an integer" step -- that
+    # class of error now surfaces earlier, at the adapter's INSERT into
+    # bronze, not here. What's still only enforceable here: nullability
+    # (bronze columns are nullable regardless of the contract, on purpose --
+    # see raw.sql), enums, max_length, policies, FKs, duplicate PKs.
+    by_dataset = {}
+    for ds, spec in dataset_specs.items():
+        cols = list(spec["columns"].keys())
+        col_list = ", ".join(c.upper() for c in cols)
+        by_dataset[ds] = session.sql(
+            f"SELECT {col_list}, FILE_ROW_NUMBER FROM {_bronze_table(ds)} WHERE BATCH_ID = ?",
+            params=[batch_id],
+        ).collect()
 
     # Row count + contiguous row-number coverage check.
     for ds, spec in declared.items():
         expected_count = spec.get("row_count", 0)
         actual = by_dataset[ds]
-        row_numbers = sorted(r.get("row_number") for r in actual)
+        row_numbers = sorted(r["FILE_ROW_NUMBER"] for r in actual)
         if len(actual) > expected_count or len(set(row_numbers)) != len(row_numbers):
             return _audit(session, batch_id, run_id, "REJECTED",
                            {"reason": f"{ds}: unexpected row count or duplicate row_number",
@@ -206,50 +207,37 @@ def run(session, batch_id: str) -> dict:
 
     for ds, spec in dataset_specs.items():
         for r in by_dataset[ds]:
-            values = r.get("values", {})
             parsed = {}
             row_ok = True
             for col, col_spec in spec["columns"].items():
-                if col not in values:
-                    violations.append(f"{ds} row {r.get('row_number')}: missing column {col}")
-                    row_ok = False
-                    continue
-                raw = values[col]
+                raw = r[col.upper()]
                 if raw is None:
                     if not col_spec.get("nullable", True):
-                        violations.append(f"{ds} row {r.get('row_number')}: {col} is required but null")
+                        violations.append(f"{ds} row {r['FILE_ROW_NUMBER']}: {col} is required but null")
                         row_ok = False
                     parsed[col] = None
                     continue
-                val, err = _parse_scalar(col_spec["type"], raw)
-                if err:
-                    violations.append(f"{ds} row {r.get('row_number')}: {err}")
-                    row_ok = False
-                    continue
+                val = float(raw) if isinstance(raw, Decimal) else raw
                 if "enum" in col_spec and val not in col_spec["enum"]:
-                    violations.append(f"{ds} row {r.get('row_number')}: {col}={val!r} not in {col_spec['enum']}")
+                    violations.append(f"{ds} row {r['FILE_ROW_NUMBER']}: {col}={val!r} not in {col_spec['enum']}")
                     row_ok = False
                 if col_spec.get("max_length") and isinstance(val, str) and len(val) > col_spec["max_length"]:
-                    violations.append(f"{ds} row {r.get('row_number')}: {col} exceeds max_length")
+                    violations.append(f"{ds} row {r['FILE_ROW_NUMBER']}: {col} exceeds max_length")
                     row_ok = False
                 parsed[col] = val
-            unexpected = set(values.keys()) - set(spec["columns"].keys())
-            if unexpected:
-                violations.append(f"{ds} row {r.get('row_number')}: unexpected columns {sorted(unexpected)}")
-                row_ok = False
 
             for policy in spec.get("policies", []):
                 if policy["kind"] == "required_if":
                     trigger = policy["when"]
                     if parsed.get(trigger["column"]) == trigger["equals"] and parsed.get(policy["column"]) is None:
-                        violations.append(f"{ds} row {r.get('row_number')}: {policy['column']} required when {trigger['column']}={trigger['equals']!r}")
+                        violations.append(f"{ds} row {r['FILE_ROW_NUMBER']}: {policy['column']} required when {trigger['column']}={trigger['equals']!r}")
                         row_ok = False
 
             if row_ok:
                 pk_cols = spec["primary_key"]
                 pk_val = tuple(parsed[c] for c in pk_cols)
                 if pk_val in pk_seen[ds]:
-                    violations.append(f"{ds} row {r.get('row_number')}: duplicate primary key {pk_val}")
+                    violations.append(f"{ds} row {r['FILE_ROW_NUMBER']}: duplicate primary key {pk_val}")
                     row_ok = False
                 else:
                     pk_seen[ds].add(pk_val)
@@ -274,7 +262,7 @@ def run(session, batch_id: str) -> dict:
         return _audit(session, batch_id, run_id, "REJECTED", {"violation_count": len(violations), "violations": violations[:25]})
 
     # Publication gate: compare-and-set against the release pointer.
-    captured_at = manifest.get("captured_at")
+    captured_at = m["CAPTURED_AT"]
     pointer = session.sql(
         "SELECT CURRENT_RELEASE_AT FROM NERO_DB.\"02_CONTROL\".CONTROL_RELEASE_POINTER WHERE POINTER_NAME = ?",
         params=[POINTER_NAME],
@@ -288,6 +276,45 @@ def run(session, batch_id: str) -> dict:
     for ds in dataset_specs:
         table = _validated_table(ds)
         cols = list(dataset_specs[ds]["columns"].keys())
+        load_mode = declared.get(ds, {}).get("load_mode", "full")
+
+        if load_mode == "incremental":
+            # Delta only: MERGE by primary key instead of the full-mode
+            # DELETE+reload below. Sibling datasets in the same batch that
+            # stay "full" still carry complete state, so in-batch FK
+            # resolution above needed no change -- their id_pools are
+            # already complete regardless of this dataset's load_mode.
+            if validated_rows[ds]:
+                staging = f'NERO_DB."02_CONTROL".STAGE_MERGE_{ds.upper()}'
+                df = session.create_dataframe(
+                    [tuple(list(r[c] for c in cols) + [batch_id]) for r in validated_rows[ds]],
+                    schema=[c.upper() for c in cols] + ["BATCH_ID"],
+                )
+                df.write.save_as_table(staging, mode="overwrite", column_order="name")
+
+                pk_cols = [c.upper() for c in dataset_specs[ds]["primary_key"]]
+                all_cols = [c.upper() for c in cols] + ["BATCH_ID"]
+                update_cols = [c for c in all_cols if c not in pk_cols]
+                on_clause = " AND ".join(f"t.{c} = s.{c}" for c in pk_cols)
+                set_clause = ", ".join(f"t.{c} = s.{c}" for c in update_cols)
+                session.sql(
+                    f"MERGE INTO {table} t USING {staging} s ON {on_clause} "
+                    f"WHEN MATCHED THEN UPDATE SET {set_clause} "
+                    f"WHEN NOT MATCHED THEN INSERT ({', '.join(all_cols)}) VALUES ({', '.join('s.' + c for c in all_cols)})"
+                ).collect()
+
+            watermark_value = declared.get(ds, {}).get("watermark_value")
+            if watermark_value is not None:
+                session.sql(
+                    "MERGE INTO NERO_DB.\"02_CONTROL\".CONTROL_INGEST_WATERMARKS t "
+                    "USING (SELECT ? AS DATASET, ? AS SOURCE_SYSTEM) s "
+                    "ON t.DATASET = s.DATASET AND t.SOURCE_SYSTEM = s.SOURCE_SYSTEM "
+                    "WHEN MATCHED THEN UPDATE SET LAST_WATERMARK = ?, UPDATED_AT = CURRENT_TIMESTAMP() "
+                    "WHEN NOT MATCHED THEN INSERT (DATASET, SOURCE_SYSTEM, LAST_WATERMARK) VALUES (?, ?, ?)",
+                    params=[ds, m["SOURCE_SYSTEM"], watermark_value, ds, m["SOURCE_SYSTEM"], watermark_value],
+                ).collect()
+            continue
+
         session.sql(f"DELETE FROM {table}").collect()
         if validated_rows[ds]:
             df = session.create_dataframe(
@@ -302,10 +329,6 @@ def run(session, batch_id: str) -> dict:
         "WHEN MATCHED THEN UPDATE SET CURRENT_BATCH_ID = ?, CURRENT_RELEASE_AT = ?, UPDATED_AT = CURRENT_TIMESTAMP() "
         "WHEN NOT MATCHED THEN INSERT (POINTER_NAME, CURRENT_BATCH_ID, CURRENT_RELEASE_AT) VALUES (?, ?, ?)",
         params=[POINTER_NAME, batch_id, captured_at, POINTER_NAME, batch_id, captured_at],
-    ).collect()
-
-    session.sql(
-        "DELETE FROM NERO_DB.\"02_CONTROL\".WORK_ENVELOPES WHERE RUN_ID = ?", params=[run_id]
     ).collect()
 
     return _audit(session, batch_id, run_id, "PUBLISHED",
@@ -326,10 +349,8 @@ import json
 
 def run(session) -> dict:
     pending = session.sql(
-        "SELECT DISTINCT PARSE_JSON(PAYLOAD):batch_id::string AS BATCH_ID "
-        "FROM NERO_DB.\"00_BRONZE\".RAW_ENVELOPES "
-        "WHERE PARSE_JSON(PAYLOAD):type::string = 'manifest' "
-        "AND PARSE_JSON(PAYLOAD):batch_id::string NOT IN ("
+        "SELECT BATCH_ID FROM NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
+        "WHERE BATCH_ID NOT IN ("
         "  SELECT BATCH_ID FROM NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT "
         "  WHERE STATUS IN ('PUBLISHED', 'REJECTED', 'SUPERSEDED')"
         ") ORDER BY 1 LIMIT 10"

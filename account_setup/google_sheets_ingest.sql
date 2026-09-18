@@ -2,17 +2,16 @@
 -- Google Sheets ingestion: fetches all 4 source datasets from public Google
 -- Sheets URLs and lands them through the *existing* pipeline, unchanged.
 --
--- No data contract modification needed -- and this is a deliberate design
--- choice, not an oversight. The contract (ingestion/contract/) governs the
--- *business rules* of the data (column types, enums, FKs) -- those are
--- identical regardless of whether bytes arrive as an uploaded file or a
--- fetched URL. Baking "source: Google Sheets" into the same hashed,
--- versioned contract that governs business-rule validation would conflate
--- two different concerns and force a real contract re-pin (new hash, new
--- CONTRACT_VERSION, PROCESS_BATCH redeploy) for what is actually just a new
--- *delivery mechanism*. So this file only adds a new way to get bytes into
--- RAW_ENVELOPES -- the contract, PROCESS_BATCH, and everything downstream
--- are completely untouched.
+-- All 4 datasets stay full-mode: a Google Sheets CSV export has no concept
+-- of "just the changed rows" -- every fetch returns the whole sheet, so
+-- there's no watermark to track here. (Contrast with the synthetic daily
+-- generator's transactions feed, which genuinely is incremental -- see
+-- account_setup/synthetic_daily_ingest.sql.)
+--
+-- Lands into the typed BRONZE_<DATASET> tables (sources/definitions/
+-- ingestion/raw.sql) + one BRONZE_BATCH_MANIFESTS row, then calls the
+-- existing, unmodified PROCESS_BATCH -- same contract validation as every
+-- other load.
 --
 -- Not true Snowpipe -- Google Sheets isn't S3/GCS/Azure Blob, so there's no
 -- cloud event-notification integration Snowflake can subscribe to. This is
@@ -57,13 +56,11 @@ import csv
 import io
 import json
 import requests
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
-from snowflake.snowpark.functions import col, lit, parse_json, seq8
-
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
 LONDON = ZoneInfo("Europe/London")
 
 SOURCES = {
@@ -91,11 +88,13 @@ def coerce_value(raw, col_type):
         return None
     if col_type == "integer":
         return int(raw)
-    if col_type in ("decimal", "date"):
-        return raw
+    if col_type == "decimal":
+        return float(raw)
+    if col_type == "date":
+        return date.fromisoformat(raw)
     if col_type == "timestamp_tz":
         naive = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
-        return naive.replace(tzinfo=LONDON).isoformat()
+        return naive.replace(tzinfo=LONDON)
     return raw
 
 
@@ -110,10 +109,26 @@ def fetch_csv_rows(url, columns):
     return rows
 
 
+def _land(session, dataset, rows, columns, batch_id):
+    if not rows:
+        return
+    tuples = [tuple(list(r[c] for c in columns) + [batch_id, i]) for i, r in enumerate(rows, start=1)]
+    df = session.create_dataframe(tuples, schema=[c.upper() for c in columns] + ["BATCH_ID", "FILE_ROW_NUMBER"])
+    df.write.save_as_table(f'NERO_DB."00_BRONZE".BRONZE_{dataset.upper()}', mode="append", column_order="name")
+
+
 def run(session):
-    today = datetime.now(timezone.utc).date()
+    # captured_at comes from Snowflake's own CURRENT_TIMESTAMP(), not this
+    # sandbox's local Python clock -- observed live to run ~14 hours ahead
+    # of Snowflake's clock under EXTERNAL_ACCESS_INTEGRATIONS, which would
+    # otherwise permanently win the release-pointer's "is this batch newer"
+    # gate against every correctly-clocked adapter until real time catches
+    # up. The gate compares against Snowflake's clock, so captured_at has
+    # to come from that same clock to never drift relative to it.
+    now_row = session.sql("SELECT CURRENT_TIMESTAMP() AS NOW").collect()[0]
+    captured_at = now_row["NOW"]
+    today = captured_at.date()
     batch_id = f"google_sheets_{today.strftime('%Y%m%d')}"
-    captured_at = datetime.now(timezone.utc).isoformat()
 
     already = session.sql(
         "SELECT 1 FROM NERO_DB.\"02_CONTROL\".CONTROL_RUN_AUDIT WHERE BATCH_ID = ? AND STATUS = 'PUBLISHED' LIMIT 1",
@@ -130,27 +145,17 @@ def run(session):
 
     datasets = {name: fetch_csv_rows(url, COLUMN_TYPES[name]) for name, url in SOURCES.items()}
 
-    lines = [json.dumps({
-        "type": "manifest", "batch_id": batch_id, "contract_id": CONTRACT_ID,
-        "contract_version": CONTRACT_VERSION, "contract_hash": contract_hash,
-        "source_system": "google_sheets", "captured_at": captured_at,
-        "datasets": {name: {"row_count": len(rows)} for name, rows in datasets.items()},
-    }, default=str)]
     for name, rows in datasets.items():
-        for i, values in enumerate(rows, start=1):
-            lines.append(json.dumps({
-                "type": "record", "batch_id": batch_id, "dataset": name,
-                "row_number": i, "values": values, "metadata": {},
-            }, default=str))
+        _land(session, name, rows, list(COLUMN_TYPES[name].keys()), batch_id)
 
-    df = session.create_dataframe([[l] for l in lines], schema=["PAYLOAD_STR"])
-    df2 = df.select(
-        parse_json(col("PAYLOAD_STR")).alias("PAYLOAD"),
-        lit("google_sheets_ingest").alias("FILE_NAME"),
-        seq8().alias("FILE_ROW_NUMBER"),
-        lit(batch_id).alias("FILE_CONTENT_KEY"),
-    )
-    df2.write.save_as_table('NERO_DB."00_BRONZE".RAW_ENVELOPES', mode="append", column_order="name")
+    datasets_meta = {name: {"row_count": len(rows)} for name, rows in datasets.items()}
+    session.sql(
+        "INSERT INTO NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
+        "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
+        "SELECT ?, ?, ?, ?, ?, ?, PARSE_JSON(?)",
+        params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, contract_hash, "google_sheets",
+                captured_at, json.dumps(datasets_meta)],
+    ).collect()
 
     result = session.sql(
         "CALL NERO_DB.\"02_CONTROL\".PROCESS_BATCH(?)", params=[batch_id]

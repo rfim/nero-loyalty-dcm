@@ -17,11 +17,14 @@
 -- deliberately kept out of the core contract-managed pipeline since it's
 -- expected to be temporary.
 --
--- Because PROCESS_BATCH does a full DELETE+replace of each VALIDATED_*
--- table per batch (see engine.sql), this can't just insert "today's new
--- rows" -- it has to read the full current SILVER snapshot and re-publish
--- it plus the new day's activity, same as every other batch this pipeline
--- has ever taken.
+-- transactions lands incrementally (only today's new rows, MERGEd into
+-- VALIDATED_TRANSACTIONS by PROCESS_BATCH) -- transactions are append-only
+-- by nature (a POS transaction never mutates once written), so this is the
+-- honest full picture, not a contrived demo. stores/loyalty_customers/
+-- loyalty_events still resubmit their full current state every run, same
+-- as before -- see account_setup/google_sheets_ingest.sql for a source that
+-- has no natural incremental signal (a full CSV export every time) and
+-- stays full-mode throughout.
 --
 -- Apply with (as ACCOUNTADMIN, same as engine.sql's other 02_CONTROL objects):
 --   snow sql -f account_setup/synthetic_daily_ingest.sql
@@ -33,7 +36,7 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
 PACKAGES = ('snowflake-snowpark-python')
 HANDLER = 'run'
-COMMENT = 'Generates one new synthetic day of stores/customers/transactions/loyalty_events on top of the current published snapshot, and publishes it via PROCESS_BATCH. Temporary stand-in for a real data feed -- see account_setup/synthetic_daily_ingest.sql.'
+COMMENT = 'Generates one new synthetic day of stores/customers/transactions/loyalty_events on top of the current published snapshot, and publishes it via PROCESS_BATCH. transactions lands incrementally (today''s new rows only); everything else stays full. Temporary stand-in for a real data feed -- see account_setup/synthetic_daily_ingest.sql.'
 AS
 $$
 import json
@@ -43,11 +46,25 @@ from datetime import datetime, timedelta, timezone
 from snowflake.snowpark.functions import col, lit, parse_json, seq8
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
+
+
+def _land(session, dataset, rows, columns, batch_id):
+    if not rows:
+        return
+    tuples = [tuple(list(r[c] for c in columns) + [batch_id, i]) for i, r in enumerate(rows, start=1)]
+    df = session.create_dataframe(tuples, schema=[c.upper() for c in columns] + ["BATCH_ID", "FILE_ROW_NUMBER"])
+    df.write.save_as_table(f'NERO_DB."00_BRONZE".BRONZE_{dataset.upper()}', mode="append", column_order="name")
 
 
 def run(session):
-    today = datetime.now(timezone.utc).date()
+    # captured_at comes from Snowflake's own CURRENT_TIMESTAMP(), not this
+    # sandbox's local Python clock -- see the matching comment in
+    # account_setup/google_sheets_ingest.sql for why (observed live clock
+    # skew under EXTERNAL_ACCESS_INTEGRATIONS). This proc has no external
+    # access integration itself, but keeping the source consistent across
+    # every adapter is cheap insurance against the same class of bug.
+    today = session.sql("SELECT CURRENT_TIMESTAMP()::DATE AS TODAY").collect()[0]["TODAY"]
     batch_id = f"synthetic_{today.strftime('%Y%m%d')}"
 
     already = session.sql(
@@ -65,12 +82,11 @@ def run(session):
 
     stores = session.sql('SELECT STORE_ID, STORE_NAME, REGION, FORMAT, OPENED_DATE FROM NERO_DB."01_SILVER".VALIDATED_STORES').collect()
     customers = session.sql('SELECT CUSTOMER_ID, SIGNUP_DATE, TIER, HOME_STORE_ID FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_CUSTOMERS').collect()
-    transactions = session.sql('SELECT TRANSACTION_ID, STORE_ID, TRANSACTION_TS, CUSTOMER_ID, BASKET_TOTAL, ITEM_COUNT, PAYMENT_TYPE FROM NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS').collect()
+    max_txn_id = session.sql('SELECT MAX(TRANSACTION_ID) AS M FROM NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS').collect()[0]["M"] or 9000000
     events = session.sql('SELECT EVENT_ID, CUSTOMER_ID, EVENT_TS, EVENT_TYPE, REWARD_ID, STORE_ID FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS').collect()
 
     store_ids = [r["STORE_ID"] for r in stores]
     customer_ids = [r["CUSTOMER_ID"] for r in customers]
-    max_txn_id = max([r["TRANSACTION_ID"] for r in transactions], default=9000000)
     max_event_id = max([r["EVENT_ID"] for r in events], default=900000)
     max_cust_id = max(customer_ids, default=0)
 
@@ -83,7 +99,7 @@ def run(session):
     for _ in range(random.choices([0, 1, 2], weights=[70, 25, 5])[0]):
         max_cust_id += 1
         new_customers.append({
-            "customer_id": max_cust_id, "signup_date": today.isoformat(),
+            "customer_id": max_cust_id, "signup_date": today,
             "tier": "Bronze", "home_store_id": random.choice(store_ids),
         })
     all_customer_ids_today = customer_ids + [c["customer_id"] for c in new_customers]
@@ -95,8 +111,8 @@ def run(session):
         cust = random.choice(all_customer_ids_today) if random.random() > 0.15 else None
         new_transactions.append({
             "transaction_id": max_txn_id, "store_id": random.choice(store_ids),
-            "transaction_ts": ts.isoformat(), "customer_id": cust,
-            "basket_total": f"{round(random.uniform(1.5, 25.0), 2):.2f}",
+            "transaction_ts": ts, "customer_id": cust,
+            "basket_total": round(random.uniform(1.5, 25.0), 2),
             "item_count": random.randint(1, 5),
             "payment_type": random.choice(["Card", "App", "Cash"]),
         })
@@ -106,7 +122,7 @@ def run(session):
         max_event_id += 1
         new_events.append({
             "event_id": max_event_id, "customer_id": c["customer_id"],
-            "event_ts": day_ts().isoformat(), "event_type": "signup",
+            "event_ts": day_ts(), "event_type": "signup",
             "reward_id": None, "store_id": c["home_store_id"],
         })
     for txn in new_transactions:
@@ -129,42 +145,34 @@ def run(session):
             })
 
     all_stores = [{"store_id": r["STORE_ID"], "store_name": r["STORE_NAME"], "region": r["REGION"],
-                    "format": r["FORMAT"], "opened_date": str(r["OPENED_DATE"])} for r in stores]
-    all_customers = [{"customer_id": r["CUSTOMER_ID"], "signup_date": str(r["SIGNUP_DATE"]),
+                    "format": r["FORMAT"], "opened_date": r["OPENED_DATE"]} for r in stores]
+    all_customers = [{"customer_id": r["CUSTOMER_ID"], "signup_date": r["SIGNUP_DATE"],
                        "tier": r["TIER"], "home_store_id": r["HOME_STORE_ID"]} for r in customers] + new_customers
-    all_transactions = [{"transaction_id": r["TRANSACTION_ID"], "store_id": r["STORE_ID"],
-                          "transaction_ts": r["TRANSACTION_TS"].isoformat(), "customer_id": r["CUSTOMER_ID"],
-                          "basket_total": str(r["BASKET_TOTAL"]), "item_count": r["ITEM_COUNT"],
-                          "payment_type": r["PAYMENT_TYPE"]} for r in transactions] + new_transactions
     all_events = [{"event_id": r["EVENT_ID"], "customer_id": r["CUSTOMER_ID"],
-                    "event_ts": r["EVENT_TS"].isoformat(), "event_type": r["EVENT_TYPE"],
+                    "event_ts": r["EVENT_TS"], "event_type": r["EVENT_TYPE"],
                     "reward_id": r["REWARD_ID"], "store_id": r["STORE_ID"]} for r in events] + new_events
 
-    datasets = {"stores": all_stores, "loyalty_customers": all_customers,
-                "transactions": all_transactions, "loyalty_events": all_events}
+    _land(session, "stores", all_stores, ["store_id", "store_name", "region", "format", "opened_date"], batch_id)
+    _land(session, "loyalty_customers", all_customers, ["customer_id", "signup_date", "tier", "home_store_id"], batch_id)
+    _land(session, "loyalty_events", all_events, ["event_id", "customer_id", "event_ts", "event_type", "reward_id", "store_id"], batch_id)
+    _land(session, "transactions", new_transactions, ["transaction_id", "store_id", "transaction_ts", "customer_id", "basket_total", "item_count", "payment_type"], batch_id)
 
-    captured_at = datetime.now(timezone.utc).isoformat()
-    lines = [json.dumps({
-        "type": "manifest", "batch_id": batch_id, "contract_id": CONTRACT_ID,
-        "contract_version": CONTRACT_VERSION, "contract_hash": contract_hash,
-        "source_system": "synthetic_daily_generator", "captured_at": captured_at,
-        "datasets": {name: {"row_count": len(rows)} for name, rows in datasets.items()},
-    }, default=str)]
-    for name, rows in datasets.items():
-        for i, values in enumerate(rows, start=1):
-            lines.append(json.dumps({
-                "type": "record", "batch_id": batch_id, "dataset": name,
-                "row_number": i, "values": values, "metadata": {},
-            }, default=str))
+    captured_at = session.sql("SELECT CURRENT_TIMESTAMP() AS NOW").collect()[0]["NOW"]
+    watermark_value = max((t["transaction_ts"] for t in new_transactions), default=captured_at).isoformat()
+    datasets_meta = {
+        "stores": {"row_count": len(all_stores)},
+        "loyalty_customers": {"row_count": len(all_customers)},
+        "loyalty_events": {"row_count": len(all_events)},
+        "transactions": {"row_count": len(new_transactions), "load_mode": "incremental", "watermark_value": watermark_value},
+    }
 
-    df = session.create_dataframe([[l] for l in lines], schema=["PAYLOAD_STR"])
-    df2 = df.select(
-        parse_json(col("PAYLOAD_STR")).alias("PAYLOAD"),
-        lit("synthetic_daily_generator").alias("FILE_NAME"),
-        seq8().alias("FILE_ROW_NUMBER"),
-        lit(batch_id).alias("FILE_CONTENT_KEY"),
-    )
-    df2.write.save_as_table('NERO_DB."00_BRONZE".RAW_ENVELOPES', mode="append", column_order="name")
+    session.sql(
+        "INSERT INTO NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
+        "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, CONTRACT_HASH, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
+        "SELECT ?, ?, ?, ?, ?, ?, PARSE_JSON(?)",
+        params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, contract_hash, "synthetic_daily_generator",
+                captured_at, json.dumps(datasets_meta)],
+    ).collect()
 
     result = session.sql(
         "CALL NERO_DB.\"02_CONTROL\".PROCESS_BATCH(?)", params=[batch_id]

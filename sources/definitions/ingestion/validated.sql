@@ -12,7 +12,7 @@ DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_LOYALTY_CUSTOMERS (
     BATCH_ID             VARCHAR(200) NOT NULL,
     PRIMARY KEY (CUSTOMER_ID)
 )
-COMMENT = 'Validated loyalty_customers dataset, current release only. Generated from contract v4.';
+COMMENT = 'Validated loyalty_customers dataset, current release only. Generated from contract v5.';
 
 DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS (
     EVENT_ID             NUMBER NOT NULL,
@@ -24,7 +24,7 @@ DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS (
     BATCH_ID             VARCHAR(200) NOT NULL,
     PRIMARY KEY (EVENT_ID)
 )
-COMMENT = 'Validated loyalty_events dataset, current release only. Generated from contract v4.';
+COMMENT = 'Validated loyalty_events dataset, current release only. Generated from contract v5.';
 
 DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_STORES (
     STORE_ID             NUMBER NOT NULL,
@@ -35,7 +35,7 @@ DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_STORES (
     BATCH_ID             VARCHAR(200) NOT NULL,
     PRIMARY KEY (STORE_ID)
 )
-COMMENT = 'Validated stores dataset, current release only. Generated from contract v4.';
+COMMENT = 'Validated stores dataset, current release only. Generated from contract v5.';
 
 DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS (
     TRANSACTION_ID       NUMBER NOT NULL,
@@ -48,7 +48,7 @@ DEFINE TABLE NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS (
     BATCH_ID             VARCHAR(200) NOT NULL,
     PRIMARY KEY (TRANSACTION_ID)
 )
-COMMENT = 'Validated transactions dataset, current release only. Generated from contract v4.';
+COMMENT = 'Validated transactions dataset, current release only. Generated from contract v5.';
 
 DEFINE VIEW NERO_DB."04_METADATA".REPORTING_CURRENT_RELEASE AS
 SELECT

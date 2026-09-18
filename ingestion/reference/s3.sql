@@ -1,6 +1,16 @@
 -- UNVERIFIED — reference only, not deployed by DCM (lives outside sources/definitions).
 -- No live AWS credentials in this account to test this route. Replace the
 -- REPLACE_* placeholders and move into sources/definitions/ once validated.
+--
+-- Under landing.type=typed (per-dataset bronze tables, not one shared
+-- envelope table), a single auto-ingest PIPE can no longer target 'the
+-- landing table' generically -- each dataset's CSV would need its own
+-- pipe (one COPY INTO per BRONZE_<DATASET>, keyed by a file naming
+-- convention like <dataset>/<batch_id>.csv) plus a separate insert into
+-- BRONZE_BATCH_MANIFESTS once all of a batch's files have landed. That's
+-- a real design, not sketched here since there's no live S3 bucket to
+-- validate it against -- left as the next step if a real S3 source is
+-- ever added.
 
 CREATE STORAGE INTEGRATION IF NOT EXISTS NERO_S3_INTEGRATION
     TYPE = EXTERNAL_STAGE
@@ -11,20 +21,4 @@ CREATE STORAGE INTEGRATION IF NOT EXISTS NERO_S3_INTEGRATION
 
 CREATE STAGE IF NOT EXISTS NERO_DB."00_BRONZE".S3_STAGE
     URL = 's3://REPLACE_BUCKET/nero/'
-    STORAGE_INTEGRATION = NERO_S3_INTEGRATION
-    FILE_FORMAT = NERO_DB."00_BRONZE".JSON_LINES;
-
-CREATE PIPE IF NOT EXISTS NERO_DB."00_BRONZE".CONTRACT_PIPE
-    AUTO_INGEST = TRUE
-AS
-COPY INTO NERO_DB."00_BRONZE".RAW_ENVELOPES
-    (PAYLOAD, FILE_NAME, FILE_ROW_NUMBER, FILE_CONTENT_KEY, INGESTED_AT)
-FROM (
-    SELECT
-        TO_JSON($1), METADATA$FILENAME, METADATA$FILE_ROW_NUMBER,
-        METADATA$FILE_CONTENT_KEY, METADATA$START_SCAN_TIME
-    FROM @NERO_DB."00_BRONZE".S3_STAGE
-)
-FILE_FORMAT = (FORMAT_NAME = NERO_DB."00_BRONZE".JSON_LINES)
-PATTERN = '.*[.]jsonl'
-ON_ERROR = 'SKIP_FILE';
+    STORAGE_INTEGRATION = NERO_S3_INTEGRATION;
