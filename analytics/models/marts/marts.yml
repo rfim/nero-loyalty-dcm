@@ -2,9 +2,9 @@ version: 2
 
 models:
   - name: mart_customer_loyalty_activity
-    description: "Grain: one row per customer."
+    description: "Grain: one row per customer. PII-safe -- exposes customer_key (surrogate), never the raw customer_id."
     columns:
-      - name: customer_id
+      - name: customer_key
         tests: [not_null, unique]
 
   - name: mart_store_daily_performance
