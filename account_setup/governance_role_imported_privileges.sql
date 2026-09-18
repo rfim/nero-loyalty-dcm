@@ -3,12 +3,14 @@
 -- so its owned apps can query SNOWFLAKE.ACCOUNT_USAGE / .ORGANIZATION_USAGE
 -- directly.
 --
--- Three of NERO_GOVERNANCE_ROLE's apps query these schemas directly rather
+-- Two of NERO_GOVERNANCE_ROLE's apps query these schemas directly rather
 -- than through a wrapper view:
---   - COST_GOVERNANCE_REPORT: SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY,
+--   - COST_REPORTS (both tabs -- originally two separate apps,
+--     COST_GOVERNANCE_REPORT and CHATBOT_COST_GOVERNANCE_REPORT, combined
+--     in the streamlit_apps/dashboards/cost_reports/ merge):
+--     SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY,
 --     SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY,
 --     SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY
---   - CHATBOT_COST_GOVERNANCE_REPORT: SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY
 --   - CHATBOT_SECURITY_GOVERNANCE_REPORT: SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY
 --
 -- These apps worked before the streamlit_apps ownership fix only because
