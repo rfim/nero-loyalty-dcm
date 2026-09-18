@@ -16,6 +16,6 @@ select
     tier,
     home_store_id,
     batch_id
-from {{ source('nero_validated', 'loyalty_customers') }}
+from {{ ref('validated_loyalty_customers') }}
 
 {% endsnapshot %}

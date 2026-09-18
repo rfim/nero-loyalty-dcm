@@ -24,6 +24,10 @@ quoting:
 
 models:
   nero_analytics:
+    silver:
+      +database: NERO_DB
+      +schema: "01_SILVER"
+      +materialized: table
     staging:
       +schema: "00_STAGING"
       +materialized: view
