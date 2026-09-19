@@ -9,13 +9,15 @@
 -- published into VALIDATED_<DATASET> (full DELETE+reload, or MERGE for
 -- incremental datasets).
 --
--- All of that is now dbt: analytics/models/silver/validated_<dataset>.sql
--- read directly from the typed BRONZE_<DATASET> tables and filter by the
--- same contract rules in plain SQL (nullability, enums, FKs, the
--- redeem/reward_id policy), with dbt tests (analytics/models/silver/
--- silver.yml) as the regression safety net. validated_transactions is
--- dbt's native `materialized='incremental'` -- the same MERGE-by-primary-
--- key behavior PROCESS_BATCH used to hand-implement for that one dataset.
+-- All of that is now dbt: analytics/models/bronze/bronze_<dataset>.sql
+-- read directly from the typed STAGING_<DATASET> tables (renamed from
+-- BRONZE_<DATASET> -- see analytics/README.md for the full Staging/Bronze/
+-- Silver rename mapping) and filter by the same contract rules in plain
+-- SQL (nullability, enums, FKs, the redeem/reward_id policy), with dbt
+-- tests (analytics/models/bronze/bronze.yml) as the regression safety net.
+-- bronze_transactions is dbt's native `materialized='incremental'` -- the
+-- same MERGE-by-primary-key behavior PROCESS_BATCH used to hand-implement
+-- for that one dataset.
 --
 -- Traded away by this move, on purpose: PROCESS_BATCH's atomic batch-level
 -- gating (a bad batch never touched VALIDATED_* at all) and its audit
@@ -26,6 +28,6 @@
 --
 -- The ingestion adapters (ingestion/load_csv_batch.py, GENERATE_SYNTHETIC_
 -- DAY(), INGEST_FROM_GOOGLE_SHEETS()) are unchanged in what they do --
--- land typed rows into bronze -- they just no longer call PROCESS_BATCH
+-- land typed rows into staging -- they just no longer call PROCESS_BATCH
 -- at the end, since it no longer exists.
 -- =============================================================================

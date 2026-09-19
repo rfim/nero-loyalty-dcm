@@ -12,4 +12,4 @@ select
     payment_type,
     batch_id,
     current_timestamp() as dbt_loaded_at
-from {{ ref('validated_transactions') }}
+from {{ ref('bronze_transactions') }}

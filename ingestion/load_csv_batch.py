@@ -2,18 +2,18 @@
 """One-off (but reusable) loader: converts the original 4 source CSVs
 (stores.csv, loyalty_customers.csv, transactions.csv, loyalty_events.csv)
 into one batch and lands each dataset directly into its typed
-BRONZE_<DATASET> table plus one BRONZE_BATCH_MANIFESTS row (audit trail
-only). Validation/publish into silver is dbt's job now (analytics/models/
-silver/) -- see sources/definitions/ingestion/engine.sql for why
+STAGING_<DATASET> table plus one STAGING_BATCH_MANIFESTS row (audit trail
+only). Validation/publish into bronze is dbt's job now (analytics/models/
+bronze/) -- see sources/definitions/ingestion/engine.sql for why
 PROCESS_BATCH was retired.
 
 Naive timestamps in transactions.csv/loyalty_events.csv are localized to
-Europe/London (the plan's own recommendation) before landing -- bronze
+Europe/London (the plan's own recommendation) before landing -- staging
 columns are TIMESTAMP_TZ, so this has to happen here, at the point values
 are cast to their target type, same as before.
 
 Values are staged locally as one CSV per dataset and landed via COPY INTO
-BRONZE_<DATASET> (through LANDING_STAGE, same credential-free internal
+STAGING_<DATASET> (through LANDING_STAGE, same credential-free internal
 stage as always) -- not row-by-row INSERTs, so this scales the same way
 the original JSONL-based loader did for the full 49k-row transactions file.
 
@@ -88,13 +88,13 @@ def land_dataset(connection, ds_name, ds_spec, rows, batch_id, tmp_dir):
     write_staged_csv(rows, columns, batch_id, local_path)
 
     subprocess.run(["snow", "stage", "copy", str(local_path),
-                     '@NERO_DB."00_BRONZE".LANDING_STAGE', "--overwrite", "-c", connection], check=True)
+                     '@NERO_DB."00_STAGING".LANDING_STAGE', "--overwrite", "-c", connection], check=True)
 
     col_list = ", ".join(c.upper() for c in columns) + ", BATCH_ID, FILE_ROW_NUMBER"
-    table = f'NERO_DB."00_BRONZE".BRONZE_{ds_name.upper()}'
+    table = f'NERO_DB."00_STAGING".STAGING_{ds_name.upper()}'
     copy_sql = f"""
     COPY INTO {table} ({col_list})
-    FROM @NERO_DB."00_BRONZE".LANDING_STAGE
+    FROM @NERO_DB."00_STAGING".LANDING_STAGE
     FILES = ('{local_path.name}')
     FILE_FORMAT = (TYPE = CSV EMPTY_FIELD_AS_NULL = TRUE)
     ON_ERROR = 'ABORT_STATEMENT';
@@ -105,7 +105,7 @@ def land_dataset(connection, ds_name, ds_spec, rows, batch_id, tmp_dir):
 def insert_manifest(connection, batch_id, contract, dataset_rows, captured_at):
     datasets_json = json.dumps({name: {"row_count": len(rows)} for name, rows in dataset_rows.items()})
     sql = f"""
-    INSERT INTO NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS
+    INSERT INTO NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS
         (BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, SOURCE_SYSTEM, CAPTURED_AT, DATASETS)
     SELECT '{batch_id}', '{contract["contract_id"]}', {contract["version"]},
         'csv_archive_upload', '{captured_at}', PARSE_JSON($${datasets_json}$$);
@@ -144,8 +144,8 @@ def main():
         print(f"{ds_name}: {len(dataset_rows[ds_name])} rows landed")
 
     insert_manifest(args.connection, batch_id, doc, dataset_rows, captured_at)
-    print(f"Landed batch {batch_id} into bronze. Run `dbt build` (or wait for "
-          f"DBT_DAILY_REFRESH_TASK) to validate and publish into silver.")
+    print(f"Landed batch {batch_id} into staging. Run `dbt build` (or wait for "
+          f"DBT_DAILY_REFRESH_TASK) to validate and publish into bronze.")
 
 
 if __name__ == "__main__":

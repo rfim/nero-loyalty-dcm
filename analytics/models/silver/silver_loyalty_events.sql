@@ -11,4 +11,4 @@ select
     reward_id,
     batch_id,
     current_timestamp() as dbt_loaded_at
-from {{ ref('validated_loyalty_events') }}
+from {{ ref('bronze_loyalty_events') }}

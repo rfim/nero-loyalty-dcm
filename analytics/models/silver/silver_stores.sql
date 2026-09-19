@@ -6,4 +6,4 @@ select
     opened_date,
     batch_id,
     current_timestamp() as dbt_loaded_at
-from {{ ref('validated_stores') }}
+from {{ ref('bronze_stores') }}

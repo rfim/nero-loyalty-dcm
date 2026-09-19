@@ -2,7 +2,7 @@
 -- staging (no fan-out, no dropped rows).
 with staging as (
     select count(*) as txn_count, sum(net_sales_amount) as total_sales
-    from {{ ref('stg_transactions') }}
+    from {{ ref('silver_transactions') }}
 ),
 fact as (
     select count(*) as txn_count, sum(net_sales_amount) as total_sales

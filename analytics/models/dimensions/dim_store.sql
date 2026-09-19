@@ -6,7 +6,7 @@ with resolved as (
         region,
         store_format,
         opened_date
-    from {{ ref('stg_stores') }}
+    from {{ ref('silver_stores') }}
 ),
 
 standard_members as (

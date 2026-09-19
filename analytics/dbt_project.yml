@@ -13,10 +13,13 @@ vars:
   reporting_timezone: Europe/London
   late_arrival_lookback_days: 3
 
-# Schema names are numbered (00_STAGING, 01_SNAPSHOTS, ...) for readability
+# Schema names are numbered (00_SILVER, 01_SNAPSHOTS, ...) for readability
 # in Snowsight's alphabetical listing — Snowflake requires identifiers
 # starting with a digit to be quoted, so schema quoting must be on, and the
 # case here must exactly match the real schema name (quoted = case-sensitive).
+# NERO_ANALYTICS's own numbering restarts at 00 independently of NERO_DB's
+# (00_STAGING/01_BRONZE there) -- see analytics/README.md for the full
+# Staging/Bronze/Silver/Gold/Mart rename mapping across both databases.
 quoting:
   database: false
   schema: true
@@ -24,12 +27,12 @@ quoting:
 
 models:
   nero_analytics:
-    silver:
+    bronze:
       +database: NERO_DB
-      +schema: "01_SILVER"
+      +schema: "01_BRONZE"
       +materialized: table
-    staging:
-      +schema: "00_STAGING"
+    silver:
+      +schema: "00_SILVER"
       +materialized: view
     dimensions:
       +schema: "02_GOLD"

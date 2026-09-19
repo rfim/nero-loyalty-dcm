@@ -1,43 +1,46 @@
 # nero_analytics (dbt)
 
-dbt owns everything downstream of the DCM-validated source tables:
-staging, customer SCD2, Kimball dimensions/facts, and reporting marts.
-Snowflake DCM (see `../sources/definitions/`) owns ingestion, contract
-validation, and the `01_SILVER.VALIDATED_*` tables — **DCM and dbt never
-manage the same fully qualified table.**
+dbt owns everything from bronze onward: contract filtering, silver
+(light transform + SCD), Kimball dimensions/facts, and reporting marts.
+Snowflake DCM (see `../sources/definitions/`) owns only the staging
+landing tables (`NERO_DB."00_STAGING"`) -- **DCM and dbt never manage the
+same fully qualified table.** This is a rename/restructure of what used
+to be a 2-layer split (DCM: bronze+silver via PROCESS_BATCH; dbt: staging
+onward) -- PROCESS_BATCH is retired (see `../sources/definitions/
+ingestion/engine.sql`), and the layer names shifted: what was "bronze"
+(raw landing) is now "staging"; what was "silver" (validated, then
+dbt-owned after PROCESS_BATCH's retirement) is now "bronze"; what was
+dbt's own "staging" (stg_* views) is now "silver".
 
 ## Ownership boundary
 
 | Capability | Owner |
 |---|---|
-| Raw landing (`00_BRONZE`) | Snowflake DCM |
-| Contract, audit, release pointer, engine (`02_CONTROL`) | Snowflake DCM |
-| Validated tables (`01_SILVER`) | Snowflake DCM |
+| Raw landing (`00_STAGING`) | Snowflake DCM |
+| Contract-filtered tables (`01_BRONZE`) | dbt (`analytics/models/bronze/`) |
 | Lineage / PII registry (`03_LINEAGE`, `05_PII_CONTROL`) | Snowflake DCM |
-| Staging and conformance | dbt |
-| Customer SCD Type 2 | dbt snapshot + model |
+| Silver (light transform, SCD) | dbt (`analytics/models/silver/` + snapshot) |
 | Kimball dimensions and facts | dbt |
 | Marketing / operations marts | dbt |
 | Dashboard | Streamlit, reads dbt marts |
 
-Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT`-only on
-`NERO_DB."01_SILVER"` (all tables + future tables) and
-`NERO_DB."02_CONTROL".CONTROL_RELEASE_POINTER` — nothing else in
-`NERO_DB` — verified directly (a `CREATE TABLE` there as `NERO_DBT_ROLE`
-fails with `Insufficient privileges`), and owns `NERO_ANALYTICS` outright.
+Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT` on
+`NERO_DB."00_STAGING"` (all tables + future tables) and `CREATE TABLE` on
+`NERO_DB."01_BRONZE"` -- nothing else in `NERO_DB` -- and owns
+`NERO_ANALYTICS` outright.
 
 ## Databases and schemas
 
 ```
-NERO_DB."00_BRONZE"                raw landing (DCM)
-NERO_DB."01_SILVER"                contract-validated tables (DCM)
-NERO_DB."02_CONTROL"               contract, audit, release pointer, engine (DCM)
+NERO_DB."00_STAGING"               typed, unvalidated landing (DCM) -- was "00_BRONZE"
+NERO_DB."01_BRONZE"                contract-filtered tables (dbt) -- was "01_SILVER"/VALIDATED_*
+NERO_DB."02_CONTROL"               retired (was: contract, audit, release pointer, PROCESS_BATCH)
 NERO_DB."03_LINEAGE"               pipeline stage/dependency documentation (DCM)
 NERO_DB."04_METADATA"              ingestion freshness/reporting (DCM)
 NERO_DB."05_PII_CONTROL"           PII column registry (DCM)
 NERO_DB.NERO_LOYALTY               Streamlit app + its stage only — the "front door"
 
-NERO_ANALYTICS."00_STAGING"       one stg_* view per validated source
+NERO_ANALYTICS."00_SILVER"        one silver_* view per bronze source -- was "00_STAGING"/stg_*
 NERO_ANALYTICS."01_SNAPSHOTS"     dbt snapshot (customer tier history)
 NERO_ANALYTICS."02_GOLD"          Kimball dimensions + facts
 NERO_ANALYTICS."03_MART_MARKETING"
@@ -127,9 +130,10 @@ authoritative record. Summary:
    reconciliation gate — acceptable since the data involved was still synthetic
    smoke-test rows, not real production history.
 
-Real reconciliation still needs actual data volume in `01_SILVER.VALIDATED_*` —
-right now it holds only synthetic smoke-test rows from
-`ingestion/smoke_test.py`.
+Real reconciliation now runs against real data volume in `01_BRONZE.BRONZE_*`
+(dbt-owned; formerly `01_SILVER.VALIDATED_*`) -- the real 4-CSV archive plus
+daily synthetic/Google Sheets landings, not just synthetic smoke-test rows.
+`ingestion/smoke_test.py` was retired along with `PROCESS_BATCH`.
 
 ## Testing
 

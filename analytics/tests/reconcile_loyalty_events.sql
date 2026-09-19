@@ -1,6 +1,6 @@
 -- Fails if fact_loyalty_event's row count drifts from staging.
 with staging as (
-    select count(*) as event_count from {{ ref('stg_loyalty_events') }}
+    select count(*) as event_count from {{ ref('silver_loyalty_events') }}
 ),
 fact as (
     select count(*) as event_count from {{ ref('fact_loyalty_event') }}

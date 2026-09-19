@@ -3,10 +3,10 @@
 -- Edit the contract and rerun `python ingestion/build.py` instead.
 -- =============================================================================
 
-DEFINE STAGE NERO_DB."00_BRONZE".LANDING_STAGE
+DEFINE STAGE NERO_DB."00_STAGING".LANDING_STAGE
     COMMENT = 'Credential-free internal stage for manual/CI batch uploads (typed per-dataset CSVs, one file per dataset per batch).';
 
-DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_CUSTOMERS (
+DEFINE TABLE NERO_DB."00_STAGING".STAGING_LOYALTY_CUSTOMERS (
     CUSTOMER_ID          NUMBER,
     SIGNUP_DATE          DATE,
     TIER                 VARCHAR(16777216),
@@ -15,9 +15,9 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_CUSTOMERS (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'Typed bronze landing for loyalty_customers, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+COMMENT = 'Typed staging landing for loyalty_customers, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v6.';
 
-DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_EVENTS (
+DEFINE TABLE NERO_DB."00_STAGING".STAGING_LOYALTY_EVENTS (
     EVENT_ID             NUMBER,
     CUSTOMER_ID          NUMBER,
     EVENT_TS             TIMESTAMP_TZ,
@@ -28,9 +28,9 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_LOYALTY_EVENTS (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'Typed bronze landing for loyalty_events, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+COMMENT = 'Typed staging landing for loyalty_events, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v6.';
 
-DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_STORES (
+DEFINE TABLE NERO_DB."00_STAGING".STAGING_STORES (
     STORE_ID             NUMBER,
     STORE_NAME           VARCHAR(200),
     REGION               VARCHAR(100),
@@ -40,9 +40,9 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_STORES (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'Typed bronze landing for stores, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+COMMENT = 'Typed staging landing for stores, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v6.';
 
-DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_TRANSACTIONS (
+DEFINE TABLE NERO_DB."00_STAGING".STAGING_TRANSACTIONS (
     TRANSACTION_ID       NUMBER,
     STORE_ID             NUMBER,
     TRANSACTION_TS       TIMESTAMP_TZ,
@@ -54,9 +54,9 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_TRANSACTIONS (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'Typed bronze landing for transactions, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v5.';
+COMMENT = 'Typed staging landing for transactions, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v6.';
 
-DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS (
+DEFINE TABLE NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS (
     BATCH_ID          VARCHAR(200)  NOT NULL,
     CONTRACT_ID       VARCHAR(200)  NOT NULL,
     CONTRACT_VERSION  NUMBER        NOT NULL,
@@ -66,4 +66,4 @@ DEFINE TABLE NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS (
     INGESTED_AT       TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),
     PRIMARY KEY (BATCH_ID)
 )
-COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count} in DATASETS. Audit trail only -- dbt reads BRONZE_<DATASET> directly and does not consult this table.';
+COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count} in DATASETS. Audit trail only -- dbt reads STAGING_<DATASET> directly and does not consult this table.';

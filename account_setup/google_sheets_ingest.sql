@@ -8,10 +8,10 @@
 -- generator's transactions feed, which genuinely is incremental -- see
 -- account_setup/synthetic_daily_ingest.sql.)
 --
--- Lands into the typed BRONZE_<DATASET> tables (sources/definitions/
--- ingestion/raw.sql) + one BRONZE_BATCH_MANIFESTS row (audit trail only).
--- Validation/publish into silver is dbt's job now (analytics/models/
--- silver/), not called synchronously from here -- see
+-- Lands into the typed STAGING_<DATASET> tables (sources/definitions/
+-- ingestion/raw.sql) + one STAGING_BATCH_MANIFESTS row (audit trail only).
+-- Validation/publish into bronze is dbt's job now (analytics/models/
+-- bronze/), not called synchronously from here -- see
 -- sources/definitions/ingestion/engine.sql for why PROCESS_BATCH was
 -- retired.
 --
@@ -51,7 +51,7 @@ RUNTIME_VERSION = '3.11'
 PACKAGES = ('snowflake-snowpark-python', 'tzdata', 'requests')
 HANDLER = 'run'
 EXTERNAL_ACCESS_INTEGRATIONS = (NERO_GOOGLE_SHEETS_ACCESS_INTEGRATION)
-COMMENT = 'Fetches all 4 source datasets from public Google Sheets CSV exports and lands them into bronze. dbt validates and publishes into silver separately (see analytics/models/silver/). Callable directly (manual trigger) or via GOOGLE_SHEETS_INGEST_TASK (automatic trigger). See account_setup/google_sheets_ingest.sql.'
+COMMENT = 'Fetches all 4 source datasets from public Google Sheets CSV exports and lands them into staging. dbt validates and publishes into bronze separately (see analytics/models/bronze/). Callable directly (manual trigger) or via GOOGLE_SHEETS_INGEST_TASK (automatic trigger). See account_setup/google_sheets_ingest.sql.'
 AS
 $$
 import csv
@@ -62,7 +62,7 @@ from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
 LONDON = ZoneInfo("Europe/London")
 
 SOURCES = {
@@ -114,7 +114,7 @@ def _land(session, dataset, rows, columns, batch_id):
         return
     tuples = [tuple(list(r[c] for c in columns) + [batch_id, i]) for i, r in enumerate(rows, start=1)]
     df = session.create_dataframe(tuples, schema=[c.upper() for c in columns] + ["BATCH_ID", "FILE_ROW_NUMBER"])
-    df.write.save_as_table(f'NERO_DB."00_BRONZE".BRONZE_{dataset.upper()}', mode="append", column_order="name")
+    df.write.save_as_table(f'NERO_DB."00_STAGING".STAGING_{dataset.upper()}', mode="append", column_order="name")
 
 
 def run(session):
@@ -130,7 +130,7 @@ def run(session):
     batch_id = f"google_sheets_{today.strftime('%Y%m%d')}"
 
     already = session.sql(
-        "SELECT 1 FROM NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS WHERE BATCH_ID = ? LIMIT 1",
+        "SELECT 1 FROM NERO_DB.\"00_STAGING\".STAGING_BATCH_MANIFESTS WHERE BATCH_ID = ? LIMIT 1",
         params=[batch_id],
     ).collect()
     if already:
@@ -141,12 +141,12 @@ def run(session):
     for name, rows in datasets.items():
         _land(session, name, rows, list(COLUMN_TYPES[name].keys()), batch_id)
 
-    # Audit trail only -- dbt (analytics/models/silver/) reads
-    # BRONZE_<DATASET> directly and validates/publishes into silver itself;
+    # Audit trail only -- dbt (analytics/models/bronze/) reads
+    # STAGING_<DATASET> directly and validates/publishes into bronze itself;
     # nothing consults this manifest to decide what to do.
     datasets_meta = {name: {"row_count": len(rows)} for name, rows in datasets.items()}
     session.sql(
-        "INSERT INTO NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
+        "INSERT INTO NERO_DB.\"00_STAGING\".STAGING_BATCH_MANIFESTS "
         "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
         "SELECT ?, ?, ?, ?, ?, PARSE_JSON(?)",
         params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, "google_sheets",
