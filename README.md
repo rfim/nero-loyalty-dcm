@@ -106,4 +106,6 @@ cd streamlit_apps && snow streamlit deploy platform_governance --replace -c <con
 ```
 
 Refer to `analytics/README.md` and `sources/definitions/README.md` for a
-complete account of the ownership boundaries among DCM, dbt, and plain SQL.
+complete account of the ownership boundaries among DCM, dbt, and plain SQL,
+and `ingestion/README.md` for how the ingestion engine works, what it
+enforces, and how to open a pull request for a new or changed source.
