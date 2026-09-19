@@ -9,10 +9,10 @@
 -- account_setup/synthetic_daily_ingest.sql.)
 --
 -- Lands into the typed STAGING_<DATASET> tables (sources/definitions/
--- ingestion/raw.sql) + one STAGING_BATCH_MANIFESTS row (audit trail only).
+-- 00_staging/raw.sql) + one STAGING_BATCH_MANIFESTS row (audit trail only).
 -- Validation/publish into bronze is dbt's job now (analytics/models/
 -- bronze/), not called synchronously from here -- see
--- sources/definitions/ingestion/engine.sql for why PROCESS_BATCH was
+-- sources/definitions/README.md for why PROCESS_BATCH was
 -- retired.
 --
 -- Not true Snowpipe -- Google Sheets isn't S3/GCS/Azure Blob, so there's no
