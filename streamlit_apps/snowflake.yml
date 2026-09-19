@@ -27,6 +27,7 @@ entities:
     identifier: {name: PLATFORM_GOVERNANCE, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
+    external_access_integrations: [NERO_PYPI_ACCESS_INTEGRATION]
     main_file: dashboards/platform_governance/platform_governance.py
     artifacts:
       - dashboards/platform_governance/platform_governance.py
