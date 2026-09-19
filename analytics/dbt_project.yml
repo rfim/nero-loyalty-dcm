@@ -49,3 +49,10 @@ models:
 snapshots:
   nero_analytics:
     +target_schema: "01_SNAPSHOTS"
+
+# Logs every test's pass/fail into a real table (see account_setup/
+# dbt_quality_log.sql) for the combined governance dashboard's Data
+# Quality tab -- otherwise nothing querying Snowflake ever sees dbt's own
+# test results.
+on-run-end:
+  - "{{ log_dbt_test_results(results) }}"

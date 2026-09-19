@@ -1,0 +1,212 @@
+<!doctype html>
+<title>Data Quality</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --paper:          #ffffff;
+    --paper-band:     #f5f6f8;
+    --ink:            #1c2b3a;
+    --ink-secondary:  #4c5c6b;
+    --ink-muted:      #8a97a3;
+    --rule:           #d7dde2;
+    --rule-strong:    #b7c1ca;
+    --accent:         #3d5a73;
+    --accent-wash:    #eaeff3;
+    --status-good:    #0ca30c;
+    --status-good-wash: #e6f5e6;
+    --status-warn:    #b8860b;
+    --status-warn-wash: #f8f0dc;
+    --status-crit:    #b23a3a;
+    --status-crit-wash: #f7e4e2;
+    --status-unknown: #8a97a3;
+    --status-unknown-wash: #eef0f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+      --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+      --accent: #8fa9bd; --accent-wash: #202a32;
+      --status-good: #3fbf3f; --status-good-wash: #16311a;
+      --status-warn: #d9a441; --status-warn-wash: #3a2f15;
+      --status-crit: #d96b6b; --status-crit-wash: #3a1e1e;
+      --status-unknown: #7c8894; --status-unknown-wash: #23292f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14191e; --paper-band: #1b2228; --ink: #eef1f4; --ink-secondary: #b6c0c9;
+    --ink-muted: #7c8894; --rule: #2c353d; --rule-strong: #3a444d;
+    --accent: #8fa9bd; --accent-wash: #202a32;
+    --status-good: #3fbf3f; --status-good-wash: #16311a;
+    --status-warn: #d9a441; --status-warn-wash: #3a2f15;
+    --status-crit: #d96b6b; --status-crit-wash: #3a1e1e;
+    --status-unknown: #7c8894; --status-unknown-wash: #23292f;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--paper-band); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13.5px; line-height: 1.55;
+  }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; text-wrap: balance; margin: 0; color: var(--ink); }
+  .page { max-width: 1080px; margin: 0 auto; padding: 0 20px 56px; }
+
+  .title-logo { height: 28px; width: auto; display: block; margin-bottom: 10px; }
+  .titleblock {
+    background: var(--paper); border-bottom: 3px solid var(--accent);
+    padding: 34px 36px 24px; margin-top: 18px;
+  }
+  .titleblock .kicker { color: var(--accent); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .titleblock h1 { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .titleblock .sub { color: var(--ink-secondary); font-size: 14px; margin-top: 6px; max-width: 680px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .meta-item .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .meta-item .v { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); margin-top: 1px; }
+  .kpi { background: var(--paper); padding: 16px 18px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+  .kpi .value { font-size: 19px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; font-family: "Source Serif 4", serif; }
+  .kpi .note { font-size: 11px; color: var(--ink-secondary); margin-top: 3px; }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  section.doc-section { background: var(--paper); padding: 28px 36px; margin-top: 1px; }
+  .section-num { color: var(--accent); font-family: "Source Serif 4", serif; font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .section-title { font-size: 18px; font-weight: 700; display: inline; }
+  .section-sub { color: var(--ink-secondary); font-size: 12.5px; max-width: 680px; margin-top: 6px; }
+
+  table.datatable { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  table.datatable th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--rule-strong); }
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.datatable td.name { font-variant-numeric: normal; font-weight: 600; }
+  .pill { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; display: inline-block; }
+  .tbl-wrap { overflow-x: auto; }
+
+  .note-block { border-left: 3px solid var(--accent); background: var(--accent-wash); padding: 12px 16px; margin-top: 18px; font-size: 12.5px; color: var(--ink-secondary); }
+  .note-block b { color: var(--ink); }
+  .note-block.crit { border-left-color: var(--status-crit); background: var(--status-crit-wash); }
+
+  footer { color: var(--ink-muted); font-size: 11px; padding: 20px 36px; background: var(--paper); margin-top: 1px; }
+  footer p { max-width: 760px; margin: 0; }
+</style>
+
+<div class="page">
+  <div class="titleblock">
+    <img class="title-logo" id="brandLogo" alt="Caffè Nero" />
+    <div class="kicker">Nero Platform &middot; Governance Series</div>
+    <h1>Data Quality</h1>
+    <p class="sub">What the platform's own dbt tests actually found, not a claim of quality without evidence — every schema test and reconciliation check dbt runs, logged per invocation.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Last run</div><div class="v" id="metaLastRun"></div></div>
+      <div class="meta-item"><div class="k">Tests in last run</div><div class="v" id="metaTestCount"></div></div>
+      <div class="meta-item"><div class="k">Currently failing</div><div class="v" id="metaFailing"></div></div>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="doc-section" id="failingSection" hidden>
+    <span class="section-num">1.</span><span class="section-title">Currently failing</span>
+    <p class="section-sub">Tests whose most recent result was not a pass — these need attention.</p>
+    <div class="tbl-wrap"><table class="datatable" id="failingTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num" id="allTestsNum">1.</span><span class="section-title">All tests, latest result</span>
+    <p class="section-sub">Every dbt test's most recent outcome — schema tests (not_null, unique, accepted_values, relationships) and singular reconciliation checks (reconcile_sales, reconcile_loyalty_events, reconcile_store_mart, redeem_requires_reward_id).</p>
+    <div class="tbl-wrap"><table class="datatable" id="allTestsTable"></table></div>
+  </section>
+
+  <section class="doc-section">
+    <span class="section-num" id="runsNum">2.</span><span class="section-title">Recent runs</span>
+    <p class="section-sub">One row per `dbt build`/`dbt test` invocation — how many tests ran, how many passed.</p>
+    <div class="tbl-wrap"><table class="datatable" id="runsTable"></table></div>
+  </section>
+
+  <footer>
+    <p>Source: NERO_ANALYTICS."05_QUALITY".DBT_TEST_RESULTS, logged by the log_dbt_test_results on-run-end hook on every `dbt build`. Not a full run log — model/snapshot results aren't logged here, only tests.</p>
+  </footer>
+</div>
+
+<script>
+const DATA = __DATA_JSON__;
+document.getElementById('brandLogo').src = 'data:image/png;base64,' + DATA.logo_b64;
+
+const fmtInt = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+const fmtDateTime = (s) => s == null ? '—' : new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const STATUS_KIND = { pass: 'good', warn: 'warn', fail: 'crit', error: 'crit', skipped: 'unknown' };
+const KIND_LABEL = { good: 'Pass', warn: 'Warn', crit: 'Fail', unknown: 'Skipped' };
+
+document.getElementById('metaLastRun').textContent = fmtDateTime(DATA.last_run_at);
+document.getElementById('metaTestCount').textContent = fmtInt(DATA.last_run_test_count);
+document.getElementById('metaFailing').textContent = fmtInt(DATA.currently_failing.length);
+
+(function () {
+  const passRate = DATA.last_run_test_count ? Math.round((DATA.last_run_pass_count / DATA.last_run_test_count) * 100) : null;
+  const kpis = [
+    { label: 'Last run status', value: DATA.currently_failing.length === 0 ? 'All passing' : `${DATA.currently_failing.length} failing`, note: fmtDateTime(DATA.last_run_at) },
+    { label: 'Pass rate, last run', value: passRate == null ? '—' : `${passRate}%`, note: `${fmtInt(DATA.last_run_pass_count)} of ${fmtInt(DATA.last_run_test_count)}` },
+    { label: 'Distinct tests tracked', value: fmtInt(DATA.distinct_test_count), note: 'schema + singular tests' },
+    { label: 'Runs logged', value: fmtInt(DATA.total_runs), note: 'since this log started' },
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
+})();
+
+(function () {
+  if (DATA.currently_failing.length === 0) return;
+  document.getElementById('failingSection').hidden = false;
+  document.getElementById('allTestsNum').textContent = '2.';
+  document.getElementById('runsNum').textContent = '3.';
+  const t = document.getElementById('failingTable');
+  t.innerHTML = `<thead><tr><th>Test</th><th>Status</th><th>Failures</th><th>Message</th><th>Last Seen</th></tr></thead>
+    <tbody>${DATA.currently_failing.map(r => `<tr>
+      <td class="name">${r.test_name}</td>
+      <td><span class="pill" style="background:var(--status-${STATUS_KIND[r.status] || 'unknown'}-wash);color:var(--status-${STATUS_KIND[r.status] || 'unknown'})">${r.status}</span></td>
+      <td>${fmtInt(r.failures)}</td>
+      <td>${r.message || '—'}</td>
+      <td>${fmtDateTime(r.run_started_at)}</td>
+    </tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const t = document.getElementById('allTestsTable');
+  const rowsData = DATA.all_tests;
+  if (rowsData.length === 0) {
+    t.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No test results logged yet.</td></tr></tbody>';
+    return;
+  }
+  t.innerHTML = `<thead><tr><th>Test</th><th>Status</th><th>Failures</th><th>Execution Time</th><th>Last Run</th></tr></thead>
+    <tbody>${rowsData.map(r => `<tr>
+      <td class="name">${r.test_name}</td>
+      <td><span class="pill" style="background:var(--status-${STATUS_KIND[r.status] || 'unknown'}-wash);color:var(--status-${STATUS_KIND[r.status] || 'unknown'})">${KIND_LABEL[STATUS_KIND[r.status]] || r.status}</span></td>
+      <td>${fmtInt(r.failures)}</td>
+      <td>${r.execution_time == null ? '—' : r.execution_time.toFixed(2) + 's'}</td>
+      <td>${fmtDateTime(r.run_started_at)}</td>
+    </tr>`).join('')}</tbody>`;
+})();
+
+(function () {
+  const t = document.getElementById('runsTable');
+  const rowsData = DATA.recent_runs;
+  if (rowsData.length === 0) {
+    t.innerHTML = '<tbody><tr><td style="color:var(--ink-muted)">No runs logged yet.</td></tr></tbody>';
+    return;
+  }
+  t.innerHTML = `<thead><tr><th>Run Started</th><th>Tests</th><th>Passed</th><th>Failed</th></tr></thead>
+    <tbody>${rowsData.map(r => `<tr>
+      <td class="name">${fmtDateTime(r.run_started_at)}</td>
+      <td>${fmtInt(r.test_count)}</td>
+      <td>${fmtInt(r.pass_count)}</td>
+      <td>${r.fail_count > 0 ? `<span class="pill" style="background:var(--status-crit-wash);color:var(--status-crit)">${r.fail_count}</span>` : fmtInt(0)}</td>
+    </tr>`).join('')}</tbody>`;
+})();
+</script>
