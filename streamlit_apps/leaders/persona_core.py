@@ -43,7 +43,7 @@ MAX_INPUT_CHARS = 2000
 TOOL_DEFS = {
     "loyalty": {
         "tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "loyalty_analyst"},
-        "resource": {"semantic_view": "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW",
+        "resource": {"semantic_view": "NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW",
                      "execution_environment": {"type": "warehouse", "warehouse": WAREHOUSE}},
         "resource_key": "loyalty_analyst",
         "orchestration": "Use loyalty_analyst for questions about stores, customers, transactions, baskets, redemption, or loyalty events.",
