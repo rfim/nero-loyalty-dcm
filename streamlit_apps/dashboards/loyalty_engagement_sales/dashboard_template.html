@@ -1,5 +1,5 @@
 <!doctype html>
-<title>Loyalty & Trading Pulse</title>
+<title>Loyalty Engagement & Sales</title>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -137,6 +137,11 @@
   .hero-title { font-size: 30px; font-weight: 600; }
   .hero-desc { color: var(--ink-secondary); max-width: 640px; margin-top: 8px; font-size: 14.5px; }
   .hero-meta { color: var(--ink-muted); font-size: 12.5px; margin-top: 10px; }
+  .brief-map { display: grid; gap: 6px; margin-top: 16px; padding: 12px 14px; background: var(--brand-wash); border-radius: 8px; max-width: 720px; }
+  .brief-item { font-size: 12.5px; color: var(--ink-secondary); }
+  .brief-item b { color: var(--brand-ink); font-weight: 700; margin-right: 6px; }
+  .brief-item a { color: var(--brand-ink); text-decoration: none; margin-left: 6px; white-space: nowrap; }
+  .brief-item a:hover { text-decoration: underline; }
 
   .kpi-row {
     display: grid;
@@ -232,25 +237,30 @@
   <div class="topbar">
     <div class="brand">
       <img class="brand-logo" id="brandLogo" alt="Caffè Nero" />
-      <span class="sub">Loyalty &amp; Trading Pulse</span>
-      <span class="source">live · NERO_DB."01_SILVER"</span>
+      <span class="sub">Loyalty Engagement &amp; Sales</span>
+      <span class="source">live · NERO_DB."01_BRONZE"</span>
     </div>
     <div class="asof" id="asOf"></div>
   </div>
 
   <div class="hero">
-    <div class="hero-title">Loyalty &amp; trading pulse</div>
-    <p class="hero-desc">A first look at the store network's loyalty engagement and how it relates to in-store spend, queried live from the four validated source extracts — cleaned and cross-checked before anything here was charted.</p>
+    <div class="hero-title">Loyalty engagement &amp; sales</div>
+    <p class="hero-desc">Built for a store operations / marketing stakeholder, queried live from the four contract-checked source extracts — cleaned and cross-checked before anything here was charted. Three sections below, one per question this dashboard exists to answer.</p>
     <div class="hero-meta" id="heroMeta"></div>
+    <div class="brief-map">
+      <div class="brief-item"><b>Q1</b> Which stores or regions lead/lag on loyalty engagement, and has that changed recently? <a href="#q1">↓ Store &amp; region performance</a></div>
+      <div class="brief-item"><b>Q2</b> How does loyalty activity relate to in-store sales — basket size, visit frequency? <a href="#q2">↓ Loyalty &amp; sales</a></div>
+      <div class="brief-item"><b>Q3</b> Anything else in the data worth a stakeholder's attention? <a href="#q3">↓ Worth a closer look</a></div>
+    </div>
   </div>
 
   <div class="kpi-row" id="kpiRow"></div>
 
   <!-- ============ SECTION 1: STORE & REGION ============ -->
-  <section>
+  <section id="q1">
     <div class="section-head">
       <div>
-        <div class="eyebrow">Store &amp; region performance</div>
+        <div class="eyebrow">Question 1 · Store &amp; region performance</div>
         <h2 class="section-title">Who's engaging customers well — and who isn't</h2>
       </div>
       <p class="section-sub">Redemption rate = redeem events ÷ earn events. A low rate means points are being earned but not coming back as visits.</p>
@@ -291,10 +301,10 @@
   </section>
 
   <!-- ============ SECTION 2: LOYALTY vs SALES ============ -->
-  <section>
+  <section id="q2">
     <div class="section-head">
       <div>
-        <div class="eyebrow">Loyalty &amp; sales</div>
+        <div class="eyebrow">Question 2 · Loyalty &amp; sales</div>
         <h2 class="section-title">Does a loyalty tier actually change buying behaviour?</h2>
       </div>
       <p class="section-sub">Every transaction with a scanned loyalty account, split by that customer's current tier, compared against till-only (walk-in) baskets.</p>
@@ -317,10 +327,10 @@
   </section>
 
   <!-- ============ SECTION 3: ATTENTION ============ -->
-  <section>
+  <section id="q3">
     <div class="section-head">
       <div>
-        <div class="eyebrow">Worth a closer look</div>
+        <div class="eyebrow">Question 3 · Worth a closer look</div>
         <h2 class="section-title">What the data itself is telling us</h2>
       </div>
       <p class="section-sub">Findings from cleaning and cross-checking the four extracts before anything above was charted.</p>
@@ -341,13 +351,13 @@
       </div>
       <div class="callout good">
         <div class="c-head"><span class="c-icon">✓</span> Referential integrity is otherwise clean</div>
-        <p>No duplicate transaction, event or customer IDs; every foreign key (store, customer) resolves; every redeem event has a reward_id and no other event type does; no negative baskets or item counts in the validated silver tables.</p>
+        <p>No duplicate transaction, event or customer IDs; every foreign key (store, customer) resolves; every redeem event has a reward_id and no other event type does; no negative baskets or item counts in the contract-filtered bronze tables.</p>
       </div>
     </div>
   </section>
 
   <footer>
-    <p>Queried live from <code>NERO_DB."01_SILVER"</code> — the same validated tables published by the contract-validation pipeline from stores.csv, loyalty_customers.csv, transactions.csv and loyalty_events.csv. Tier is each customer's <em>current</em> tier as recorded today, not their historical tier at the time of each visit — the source data has no tier-change history (old/new tier) to reconstruct that precisely, so treat the loyalty/sales comparison above as directional, not exact.</p>
+    <p>Queried live from <code>NERO_DB."01_BRONZE"</code> — the dbt-built, contract-filtered tables published from stores.csv, loyalty_customers.csv, transactions.csv and loyalty_events.csv. Tier is each customer's <em>current</em> tier as recorded today, not their historical tier at the time of each visit — the source data has no tier-change history (old/new tier) to reconstruct that precisely, so treat the loyalty/sales comparison above as directional, not exact.</p>
   </footer>
 
 </div>
