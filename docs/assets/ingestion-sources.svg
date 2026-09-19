@@ -1,0 +1,83 @@
+<svg viewBox="0 0 1000 340" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <style>
+      .card { fill: #fdf6e8; stroke: #1c130d; stroke-opacity: .12; stroke-width: 1.5; }
+      .icon-stroke { fill: none; stroke: #1c130d; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-amber { fill: none; stroke: #b8691f; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-fill-amber { fill: #e8a659; }
+      .icon-fill-ink { fill: #1c130d; }
+      .src-title { fill: #1c130d; font-size: 19px; font-weight: 700; }
+      .src-sub { fill: #7a6a58; font-size: 12.5px; }
+      .stage-title { fill: #1c130d; font-size: 26px; font-weight: 700; }
+      .stage-sub { fill: #7a6a58; font-size: 15px; }
+      .arrow { stroke: #b8691f; stroke-width: 3; fill: none; stroke-linecap: round; }
+      .arrowhead { fill: #b8691f; }
+      .pill { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+      .pill-deployed { fill: #b8691f; }
+      .pill-temp { fill: #a89380; }
+    </style>
+  </defs>
+
+  <rect width="1000" height="340" fill="#fffaf0"/>
+
+  <!-- ============ SOURCE 1: CSV upload ============ -->
+  <g transform="translate(20,10)">
+    <rect class="card" width="280" height="88" rx="14"/>
+    <g transform="translate(44,44)">
+      <path class="icon-stroke" d="M-16,-24 L6,-24 L16,-14 L16,24 L-16,24 Z"/>
+      <path class="icon-stroke" d="M6,-24 L6,-14 L16,-14"/>
+      <path class="icon-amber" d="M-8,4 L-8,16 M0,-2 L0,16 M8,8 L8,16"/>
+    </g>
+    <text class="src-title" x="80" y="38">CSV Upload</text>
+    <text class="src-sub" x="80" y="58">internal_stage · manual / CI</text>
+    <text class="pill pill-deployed" x="80" y="74">DEPLOYED</text>
+  </g>
+
+  <!-- ============ SOURCE 2: Google Sheets ============ -->
+  <g transform="translate(20,126)">
+    <rect class="card" width="280" height="88" rx="14"/>
+    <g transform="translate(44,44)">
+      <rect class="icon-stroke" x="-18" y="-18" width="36" height="36" rx="3"/>
+      <line class="icon-stroke" x1="-18" y1="-6" x2="18" y2="-6"/>
+      <line class="icon-stroke" x1="-18" y1="6" x2="18" y2="6"/>
+      <line class="icon-amber" x1="-6" y1="-18" x2="-6" y2="18"/>
+      <line class="icon-amber" x1="6" y1="-18" x2="6" y2="18"/>
+    </g>
+    <text class="src-title" x="80" y="38">Google Sheets</text>
+    <text class="src-sub" x="80" y="58">google_sheets · scheduled fetch</text>
+    <text class="pill pill-deployed" x="80" y="74">DEPLOYED</text>
+  </g>
+
+  <!-- ============ SOURCE 3: Synthetic generator ============ -->
+  <g transform="translate(20,242)">
+    <rect class="card" width="280" height="88" rx="14"/>
+    <g transform="translate(44,46)">
+      <path class="icon-stroke" d="M-7,-22 L-7,-4 L-19,20 C-21,25 -18,28 -13,28 L13,28 C18,28 21,25 19,20 L7,-4 L7,-22"/>
+      <line class="icon-stroke" x1="-10" y1="-22" x2="10" y2="-22"/>
+      <circle class="icon-fill-amber" cx="-4" cy="14" r="3"/>
+      <circle class="icon-fill-amber" cx="6" cy="18" r="2.5"/>
+      <circle class="icon-fill-amber" cx="0" cy="22" r="2"/>
+    </g>
+    <text class="src-title" x="80" y="38">Synthetic</text>
+    <text class="src-sub" x="80" y="58">synthetic · daily generator</text>
+    <text class="pill pill-temp" x="80" y="74">TEMPORARY</text>
+  </g>
+
+  <!-- converging connector lines -->
+  <path class="arrow" d="M300,54 C 420,54 420,170 560,170"/>
+  <path class="arrow" d="M300,170 L 560,170"/>
+  <path class="arrow" d="M300,286 C 420,286 420,170 560,170"/>
+  <g transform="translate(560,170)"><path class="arrowhead" d="M0,-7 L 14,0 L 0,7 Z"/></g>
+
+  <!-- ============ DESTINATION: staging (bean) ============ -->
+  <g transform="translate(620,20)">
+    <rect class="card" width="360" height="300" rx="18"/>
+    <g transform="translate(180,110) rotate(-18)">
+      <ellipse class="icon-stroke" cx="0" cy="0" rx="46" ry="64"/>
+      <path class="icon-stroke" d="M0,-62 C 17,-31 17,31 0,62" />
+    </g>
+    <text class="stage-title" x="180" y="220" text-anchor="middle">00_STAGING</text>
+    <text class="stage-sub" x="180" y="246" text-anchor="middle">one typed STAGING_&lt;DATASET&gt; table per dataset</text>
+    <text class="stage-sub" x="180" y="266" text-anchor="middle">every source lands here, unvalidated</text>
+  </g>
+</svg>
