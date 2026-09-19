@@ -34,11 +34,11 @@ Enforced at the grant level: `NERO_DBT_ROLE` has `SELECT` on
 ```
 NERO_DB."00_STAGING"               typed, unvalidated landing (DCM) -- was "00_BRONZE"
 NERO_DB."01_BRONZE"                contract-filtered tables (dbt) -- was "01_SILVER"/VALIDATED_*
-NERO_DB."02_CONTROL"               retired (was: contract, audit, release pointer, PROCESS_BATCH)
+NERO_DB."02_CONTROL"               CONTRACT_REJECTIONS view (staged vs. published keys per dataset) --
+                                    was: contract registry, run audit, release pointer, PROCESS_BATCH
 NERO_DB."03_LINEAGE"               pipeline stage/dependency documentation (DCM)
-NERO_DB."04_METADATA"              ingestion freshness/reporting (DCM)
+NERO_DB."04_METADATA"              DATASET_FRESHNESS view (staging vs. bronze publish lag per dataset)
 NERO_DB."05_PII_CONTROL"           PII column registry (DCM)
-NERO_DB.NERO_LOYALTY               Streamlit app + its stage only — the "front door"
 
 NERO_ANALYTICS."00_SILVER"        one silver_* view per bronze source -- was "00_STAGING"/stg_*
 NERO_ANALYTICS."01_SNAPSHOTS"     dbt snapshot (customer tier history)

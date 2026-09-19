@@ -42,7 +42,7 @@ import chat_store
 
 st.set_page_config(page_title="Nero Assistant", layout="wide", initial_sidebar_state="expanded")
 
-SEMANTIC_VIEW = "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW"
+SEMANTIC_VIEW = "NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW"
 SEARCH_SERVICE = "NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC"
 WAREHOUSE = "NERO_BI_WH"
 

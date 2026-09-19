@@ -20,22 +20,29 @@
 -- =============================================================================
 
 -- ============================ SEMANTIC VIEW ==================================
--- Cortex Analyst target: structured NL-to-SQL over the loyalty silver tables.
+-- Cortex Analyst target: structured NL-to-SQL over the loyalty bronze tables.
 -- CUSTOMERS.HOME_STORE_ID is exposed as a plain dimension, not a join
 -- relationship -- a second STORES join path (via CUSTOMERS) alongside the
 -- direct TRANSACTIONS->STORES join makes the graph multi-path, which
 -- semantic views reject ("Invalid dimension specified: Multi-path
 -- relationship... not supported").
+--
+-- Lives in NERO_GOVERNANCE.CORTEX_TOOLS (moved from NERO_DB.NERO_LOYALTY,
+-- which was dropped -- a dead, near-empty schema holding nothing but this
+-- view; CORTEX_TOOLS already holds the agent, MCP server and the sibling
+-- GOVERNANCE_SEMANTIC_VIEW). Repointed at "01_BRONZE" -- "01_SILVER"/
+-- VALIDATED_* was retired by the Staging/Bronze/Silver rename, which left
+-- this view silently broken until this fix.
 
-CREATE OR REPLACE SEMANTIC VIEW NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW
+CREATE OR REPLACE SEMANTIC VIEW NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW
   TABLES (
-    STORES AS NERO_DB."01_SILVER".VALIDATED_STORES PRIMARY KEY (STORE_ID)
+    STORES AS NERO_DB."01_BRONZE".BRONZE_STORES PRIMARY KEY (STORE_ID)
       COMMENT = 'The 12 Caffe Nero store locations.',
-    CUSTOMERS AS NERO_DB."01_SILVER".VALIDATED_LOYALTY_CUSTOMERS PRIMARY KEY (CUSTOMER_ID)
+    CUSTOMERS AS NERO_DB."01_BRONZE".BRONZE_LOYALTY_CUSTOMERS PRIMARY KEY (CUSTOMER_ID)
       COMMENT = 'Enrolled loyalty customers, with their current tier.',
-    TRANSACTIONS AS NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS PRIMARY KEY (TRANSACTION_ID)
+    TRANSACTIONS AS NERO_DB."01_BRONZE".BRONZE_TRANSACTIONS PRIMARY KEY (TRANSACTION_ID)
       COMMENT = 'POS transactions, 90-day window. CUSTOMER_ID is null for walk-in (non-loyalty) baskets.',
-    EVENTS AS NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS PRIMARY KEY (EVENT_ID)
+    EVENTS AS NERO_DB."01_BRONZE".BRONZE_LOYALTY_EVENTS PRIMARY KEY (EVENT_ID)
       COMMENT = 'Loyalty events: signup, earn, redeem, tier_change.'
   )
   RELATIONSHIPS (
@@ -66,7 +73,7 @@ CREATE OR REPLACE SEMANTIC VIEW NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW
     EVENTS.EVENT_COUNT AS COUNT(EVENTS.EVENT_ID) COMMENT = 'Number of loyalty events.',
     CUSTOMERS.CUSTOMER_COUNT AS COUNT(CUSTOMERS.CUSTOMER_ID) COMMENT = 'Number of enrolled customers.'
   )
-  COMMENT = 'Nero loyalty & sales semantic model for Cortex Analyst -- ask natural-language questions about stores, customers, transactions and loyalty events.';
+  COMMENT = 'Nero loyalty & sales semantic model for Cortex Analyst -- ask natural-language questions about stores, customers, transactions and loyalty events. Moved from NERO_DB.NERO_LOYALTY and repointed at 01_BRONZE (was 01_SILVER/VALIDATED_*, retired).';
 
 -- ========================= SEARCH CORPUS + SERVICE ============================
 -- Cortex Search needs change tracking on a real table it owns the refresh
@@ -124,7 +131,7 @@ FROM SPECIFICATION $$
   ],
   "tool_resources": {
     "loyalty_analyst": {
-      "semantic_view": "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW",
+      "semantic_view": "NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW",
       "execution_environment": {"type": "warehouse", "warehouse": "NERO_BI_WH"}
     },
     "findings_search": {"name": "NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC", "max_results": 5}
@@ -144,7 +151,7 @@ FROM SPECIFICATION $$
   "tools": [
     {"type": "CORTEX_SEARCH_SERVICE_QUERY", "identifier": "NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC",
      "name": "search_security_findings", "description": "Search Trust Center security/governance findings"},
-    {"type": "CORTEX_ANALYST_MESSAGE", "identifier": "NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW",
+    {"type": "CORTEX_ANALYST_MESSAGE", "identifier": "NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW",
      "name": "query_loyalty_data", "description": "Ask natural-language questions about Nero loyalty/sales data"}
   ]
 }
@@ -156,8 +163,7 @@ $$;
 -- under that role) can actually use them.
 
 GRANT USAGE ON DATABASE NERO_DB TO ROLE NERO_BI_ROLE;
-GRANT USAGE ON SCHEMA NERO_DB.NERO_LOYALTY TO ROLE NERO_BI_ROLE;
-GRANT REFERENCES ON SEMANTIC VIEW NERO_DB.NERO_LOYALTY.LOYALTY_SEMANTIC_VIEW TO ROLE NERO_BI_ROLE;
+GRANT REFERENCES ON SEMANTIC VIEW NERO_GOVERNANCE.CORTEX_TOOLS.LOYALTY_SEMANTIC_VIEW TO ROLE NERO_BI_ROLE;
 GRANT USAGE ON CORTEX SEARCH SERVICE NERO_GOVERNANCE.SECURITY.FINDINGS_SEARCH_SVC TO ROLE NERO_BI_ROLE;
 GRANT SELECT ON TABLE NERO_GOVERNANCE.SECURITY.FINDINGS_DOCS TO ROLE NERO_BI_ROLE;
 GRANT USAGE ON AGENT NERO_GOVERNANCE.CORTEX_TOOLS.NERO_PLATFORM_AGENT TO ROLE NERO_BI_ROLE;
