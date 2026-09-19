@@ -53,6 +53,10 @@ snapshots:
 # Logs every test's pass/fail into a real table (see account_setup/
 # dbt_quality_log.sql) for the combined governance dashboard's Data
 # Quality tab -- otherwise nothing querying Snowflake ever sees dbt's own
-# test results.
+# test results. log_pipeline_run does the same for model run outcomes
+# (successful-run history + ETL/pipeline performance) and the current
+# incremental watermark per dataset (see account_setup/
+# dbt_pipeline_metadata.sql).
 on-run-end:
   - "{{ log_dbt_test_results(results) }}"
+  - "{{ log_pipeline_run(results) }}"
