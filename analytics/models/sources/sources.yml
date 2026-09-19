@@ -6,7 +6,7 @@ sources:
       Typed, unvalidated landing tables (staging layer -- renamed from
       "bronze"; see analytics/README.md for the full Staging/Bronze/Silver
       rename mapping) -- generated from ingestion/contract/ (see
-      sources/definitions/ingestion/raw.sql), one table per dataset,
+      sources/definitions/00_staging/raw.sql), one table per dataset,
       written directly by the 3 ingestion adapters
       (ingestion/load_csv_batch.py, GENERATE_SYNTHETIC_DAY(),
       INGEST_FROM_GOOGLE_SHEETS()). Columns are nullable regardless of the

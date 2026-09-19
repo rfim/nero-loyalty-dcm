@@ -40,4 +40,4 @@ jobs:
 
       - name: DCM analyze (validate only, no deploy)
         run: |
-          snow dcm raw-analyze 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci
+          snow dcm raw-analyze 'NERO_DB.PUBLIC.NERO_LOYALTY_PROJECT' -c ci

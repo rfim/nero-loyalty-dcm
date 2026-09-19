@@ -5,5 +5,11 @@ default_target: 'DEV'
 targets:
   DEV:
     account_identifier: PEGSZYG-IF37362
-    project_name: 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT'
+    # NERO_DB.NERO_LOYALTY (this project's old home) was dropped -- it was
+    # a near-empty schema holding one unrelated Cortex object (moved to
+    # NERO_GOVERNANCE.CORTEX_TOOLS), not anything DCM-managed. PUBLIC is a
+    # neutral anchor: this project spans 3 schemas (00_STAGING, 03_LINEAGE,
+    # 05_PII_CONTROL -- see sources/definitions/README.md), so it doesn't
+    # belong inside any one of them.
+    project_name: 'NERO_DB.PUBLIC.NERO_LOYALTY_PROJECT'
     project_owner: ACCOUNTADMIN

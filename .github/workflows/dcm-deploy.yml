@@ -39,10 +39,10 @@ jobs:
             --no-interactive
 
       - name: DCM plan
-        run: snow dcm plan 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci
+        run: snow dcm plan 'NERO_DB.PUBLIC.NERO_LOYALTY_PROJECT' -c ci
 
       - name: DCM deploy
-        run: snow dcm deploy 'NERO_DB.NERO_LOYALTY.NERO_LOYALTY_PROJECT' -c ci --alias "ci-${{ github.sha }}"
+        run: snow dcm deploy 'NERO_DB.PUBLIC.NERO_LOYALTY_PROJECT' -c ci --alias "ci-${{ github.sha }}"
 
       - name: Seed data contract
         run: python ingestion/build.py --seed -c ci

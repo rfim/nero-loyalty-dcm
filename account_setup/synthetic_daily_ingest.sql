@@ -12,14 +12,14 @@
 --   ALTER TASK NERO_ANALYTICS.DBT_PROJECT.DBT_DAILY_REFRESH_TASK SUSPEND;
 --   DROP TASK/PROCEDURE ... (optional, once a real feed replaces this)
 --
--- Not DCM-managed (unlike sources/definitions/ingestion/engine.sql) --
+-- Not DCM-managed (unlike sources/definitions/README.md) --
 -- deliberately kept out of the core contract-managed pipeline since it's
 -- expected to be temporary.
 --
 -- Lands into staging only -- validation/publish into bronze is now dbt's
 -- job (analytics/models/bronze/), triggered by DBT_DAILY_REFRESH_TASK, not
--- called synchronously from here (see sources/definitions/ingestion/
--- engine.sql for why PROCESS_BATCH was retired).
+-- called synchronously from here (see sources/definitions/README.md for
+-- why PROCESS_BATCH was retired).
 --
 -- transactions lands incrementally (only today's new rows -- dbt's
 -- bronze_transactions model MERGEs them in by transaction_id) --

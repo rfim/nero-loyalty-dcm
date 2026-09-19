@@ -4,8 +4,8 @@
 -- don't go stale once staging starts changing daily. `dbt build` now
 -- covers the whole chain in one run -- staging->bronze (analytics/models/
 -- bronze/) through silver/gold/marts -- since PROCESS_BATCH was retired
--- in favor of dbt models/tests (see sources/definitions/ingestion/
--- engine.sql). 15-minute offset is generous headroom over the ~30s the
+-- in favor of dbt models/tests (see sources/definitions/README.md).
+-- 15-minute offset is generous headroom over the ~30s the
 -- generator+landing actually takes.
 --
 -- Independently cron-scheduled rather than a Snowflake task DAG (AFTER)

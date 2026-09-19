@@ -4,7 +4,7 @@
 into one batch and lands each dataset directly into its typed
 STAGING_<DATASET> table plus one STAGING_BATCH_MANIFESTS row (audit trail
 only). Validation/publish into bronze is dbt's job now (analytics/models/
-bronze/) -- see sources/definitions/ingestion/engine.sql for why
+bronze/) -- see sources/definitions/README.md for why
 PROCESS_BATCH was retired.
 
 Naive timestamps in transactions.csv/loyalty_events.csv are localized to
