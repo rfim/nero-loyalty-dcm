@@ -36,9 +36,11 @@ Emits:
     column-attach step, also UNVERIFIED: this Snowflake account's edition
     doesn't support masking policies at all, confirmed independent of DCM)
   - ingestion/generated/google_sheets_procedure.sql (real SQL, NOT
-    DCM-managed -- a stored procedure plus its task and grants, none of
-    them DEFINE-able DCM objects. Embeds the URLs from
-    ingestion.sources[google_sheets_feed].google_sheets.urls. Deploy
+    DCM-managed -- a stored procedure plus a grant, neither a DEFINE-able
+    DCM object. Embeds the URLs from
+    ingestion.sources[google_sheets_feed].google_sheets.urls. The task
+    that calls this procedure lives elsewhere -- see
+    account_setup/daily_pipeline_orchestration.sql. Deploy this file
     AFTER account_setup/google_sheets_ingest.sql, which creates the
     external access integration this procedure requires at CREATE time.)
 
@@ -326,12 +328,20 @@ def gen_google_sheets_procedure(doc):
     at runtime, so the contract's values have to be baked into the deployed
     SQL text at build time -- this function is that bake step.
 
-    The task and grants that depend on this procedure are appended here
-    too (static, not contract-derived, but GRANT USAGE ON PROCEDURE
-    requires the procedure to already exist, so they cannot live in
+    The grant that depends on this procedure is appended here too (static,
+    not contract-derived, but GRANT USAGE ON PROCEDURE requires the
+    procedure to already exist, so it cannot live in
     account_setup/google_sheets_ingest.sql, which must run BEFORE this
     file to create the external access integration CREATE PROCEDURE
-    itself needs). That file owns the network rule and integration only."""
+    itself needs). That file owns the network rule and integration only.
+
+    The task that calls this procedure (GOOGLE_SHEETS_INGEST_TASK) is NOT
+    generated here -- it lives in NERO_ANALYTICS.DBT_PROJECT, owned by
+    NERO_DBT_ROLE, as part of the daily pipeline task DAG. See
+    account_setup/daily_pipeline_orchestration.sql for why (Snowflake
+    requires every task in one DAG to share an owner and schema, so a
+    task calling this procedure and a task depending on it via AFTER
+    cannot live in two different places)."""
     source = find_source(doc, "google_sheets")
     if source is None:
         return ""
@@ -482,20 +492,15 @@ def run(session):
     }}
 $$;
 
--- Automatic trigger: daily, matching the cadence every other feed in this
--- pipeline uses. Manual trigger is just CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS()
--- directly -- the same procedure serves both, same duality real Snowpipe
--- offers between auto-ingest and REST-triggered runs.
-CREATE OR REPLACE TASK NERO_DB."02_CONTROL".GOOGLE_SHEETS_INGEST_TASK
-  WAREHOUSE = 'NERO_LOAD_WH'
-  SCHEDULE = 'USING CRON 30 6 * * * UTC'
-  COMMENT = 'Automatic trigger for INGEST_FROM_GOOGLE_SHEETS(). Manual trigger: CALL the procedure directly. See account_setup/google_sheets_ingest.sql.'
-AS
-  CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS();
+-- Automatic trigger: GOOGLE_SHEETS_INGEST_TASK in
+-- NERO_ANALYTICS.DBT_PROJECT (account_setup/daily_pipeline_orchestration.sql),
+-- part of the daily pipeline DAG. Manual trigger is just
+-- CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS() directly -- the same
+-- procedure serves both.
 
-ALTER TASK NERO_DB."02_CONTROL".GOOGLE_SHEETS_INGEST_TASK RESUME;
-
--- Let the ingestion role trigger this manually too, not just ACCOUNTADMIN.
+-- Let the ingestion role trigger this manually too, not just ACCOUNTADMIN
+-- (NERO_DBT_ROLE's own USAGE grant, for the scheduled task, is in
+-- account_setup/daily_pipeline_orchestration.sql).
 GRANT USAGE ON INTEGRATION NERO_GOOGLE_SHEETS_ACCESS_INTEGRATION TO ROLE NERO_INGEST_ROLE;
 GRANT USAGE ON PROCEDURE NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS() TO ROLE NERO_INGEST_ROLE;
 """
