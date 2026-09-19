@@ -1,0 +1,89 @@
+<svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <style>
+      .card { fill: #fdf6e8; stroke: #1c130d; stroke-opacity: .12; stroke-width: 1.5; }
+      .icon-stroke { fill: none; stroke: #1c130d; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-amber { fill: none; stroke: #b8691f; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-fill-amber { fill: #e8a659; }
+      .icon-fill-ink { fill: #1c130d; }
+      .stage-title { fill: #1c130d; font-size: 26px; font-weight: 700; }
+      .stage-sub { fill: #7a6a58; font-size: 15px; }
+      .stage-num { fill: #b8691f; font-size: 14px; font-weight: 700; letter-spacing: 2px; }
+      .arrow { stroke: #b8691f; stroke-width: 4; fill: none; stroke-linecap: round; }
+      .arrowhead { fill: #b8691f; }
+    </style>
+  </defs>
+
+  <rect width="1000" height="300" fill="#fffaf0"/>
+
+  <line x1="110" y1="150" x2="890" y2="150" stroke="#e6d3ac" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round"/>
+
+  <!-- ============ STAGE 1: BRONZE (roasting) ============ -->
+  <g transform="translate(20,20)">
+    <rect class="card" x="0" y="0" width="200" height="260" rx="18"/>
+    <text class="stage-num" x="100" y="34" text-anchor="middle">01</text>
+    <g transform="translate(100,95)">
+      <ellipse class="icon-stroke" cx="0" cy="6" rx="34" ry="46" transform="rotate(-18 0 6)"/>
+      <path class="icon-stroke" d="M-2,-38 C 10,-16 10,28 -2,50" transform="rotate(-18 0 6)"/>
+      <path class="icon-amber" d="M-28,-46 C -31,-53 -25,-57 -27,-64" />
+      <path class="icon-amber" d="M0,-50 C -3,-57 5,-61 3,-68" />
+      <path class="icon-amber" d="M26,-46 C 23,-53 31,-57 29,-64" />
+    </g>
+    <text class="stage-title" x="100" y="190" text-anchor="middle">Bronze</text>
+    <text class="stage-sub" x="100" y="214" text-anchor="middle">contract-filtered</text>
+    <text class="stage-sub" x="100" y="234" text-anchor="middle">01_BRONZE · dbt</text>
+  </g>
+
+  <g transform="translate(220,150)"><path class="arrow" d="M0,0 L 12,0"/><path class="arrowhead" d="M8,-7 L 20,0 L 8,7 Z"/></g>
+
+  <!-- ============ STAGE 2: SILVER (grinding) ============ -->
+  <g transform="translate(260,20)">
+    <rect class="card" x="0" y="0" width="200" height="260" rx="18"/>
+    <text class="stage-num" x="100" y="34" text-anchor="middle">02</text>
+    <g transform="translate(100,90)">
+      <polygon class="icon-stroke" points="0,-40 35,-20 35,20 0,40 -35,20 -35,-20"/>
+      <circle class="icon-fill-ink" cx="0" cy="0" r="7"/>
+      <circle class="icon-fill-amber" cx="-14" cy="58" r="4"/>
+      <circle class="icon-fill-amber" cx="0" cy="64" r="5"/>
+      <circle class="icon-fill-amber" cx="15" cy="58" r="4"/>
+      <circle class="icon-fill-amber" cx="4" cy="52" r="3"/>
+    </g>
+    <text class="stage-title" x="100" y="190" text-anchor="middle">Silver</text>
+    <text class="stage-sub" x="100" y="214" text-anchor="middle">light transform</text>
+    <text class="stage-sub" x="100" y="234" text-anchor="middle">00_SILVER · views</text>
+  </g>
+
+  <g transform="translate(460,150)"><path class="arrow" d="M0,0 L 12,0"/><path class="arrowhead" d="M8,-7 L 20,0 L 8,7 Z"/></g>
+
+  <!-- ============ STAGE 3: GOLD (brewing) ============ -->
+  <g transform="translate(500,20)">
+    <rect class="card" x="0" y="0" width="200" height="260" rx="18"/>
+    <text class="stage-num" x="100" y="34" text-anchor="middle">03</text>
+    <g transform="translate(100,90)">
+      <path class="icon-stroke" d="M-32,-30 L 32,-30 L 8,40 L -8,40 Z"/>
+      <line class="icon-stroke" x1="-40" y1="-30" x2="40" y2="-30"/>
+      <path class="icon-amber" d="M0,44 C 0,54 -6,54 -6,64 C -6,70 6,70 6,64 C 6,54 0,54 0,44 Z" />
+    </g>
+    <text class="stage-title" x="100" y="190" text-anchor="middle">Gold</text>
+    <text class="stage-sub" x="100" y="214" text-anchor="middle">star schema</text>
+    <text class="stage-sub" x="100" y="234" text-anchor="middle">02_GOLD · dims/facts</text>
+  </g>
+
+  <g transform="translate(700,150)"><path class="arrow" d="M0,0 L 12,0"/><path class="arrowhead" d="M8,-7 L 20,0 L 8,7 Z"/></g>
+
+  <!-- ============ STAGE 4: MARTS (cup) ============ -->
+  <g transform="translate(740,20)">
+    <rect class="card" x="0" y="0" width="200" height="260" rx="18"/>
+    <text class="stage-num" x="100" y="34" text-anchor="middle">04</text>
+    <g transform="translate(100,95)">
+      <path class="icon-amber" d="M-14,-58 C -20,-50 -8,-46 -14,-38" />
+      <path class="icon-amber" d="M10,-58 C 4,-50 16,-46 10,-38" />
+      <path class="icon-stroke" d="M-34,-28 L 30,-28 L 24,18 C 22,30 -16,30 -18,18 Z"/>
+      <path class="icon-stroke" d="M30,-22 C 48,-22 48,2 30,2"/>
+      <ellipse class="icon-stroke" cx="-2" cy="34" rx="34" ry="8"/>
+    </g>
+    <text class="stage-title" x="100" y="190" text-anchor="middle">Marts</text>
+    <text class="stage-sub" x="100" y="214" text-anchor="middle">one per question</text>
+    <text class="stage-sub" x="100" y="234" text-anchor="middle">03/04_MART_*</text>
+  </g>
+</svg>
