@@ -14,51 +14,32 @@ entities:
       - shared/assets/caffe_nero_logo.png
     title: "Loyalty & Trading Pulse"
 
-  cost_reports:
+  platform_governance:
+    # Replaces the 3 separate entities this used to be (cost_reports,
+    # security_governance_report, pipeline_health) -- one app, five tabs
+    # (Pipeline Health, Security & Governance, Data Quality, Platform
+    # Cost, Chatbot Cost). Deploying this entity with --replace overwrites
+    # the existing PLATFORM_GOVERNANCE object if already deployed; the 3
+    # old objects (COST_REPORTS, SECURITY_GOVERNANCE_REPORT,
+    # PIPELINE_HEALTH) are separate objects this doesn't touch and must be
+    # dropped explicitly once this is verified live.
     type: streamlit
-    identifier: {name: COST_REPORTS, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    identifier: {name: PLATFORM_GOVERNANCE, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: dashboards/cost_reports/cost_reports.py
+    main_file: dashboards/platform_governance/platform_governance.py
     artifacts:
-      - dashboards/cost_reports/cost_reports.py
-      - dashboards/cost_reports/cost_dashboard_template.html
-      - dashboards/cost_reports/chatbot_cost_dashboard_template.html
+      - dashboards/platform_governance/platform_governance.py
+      - dashboards/platform_governance/pipeline_health_template.html
+      - dashboards/platform_governance/security_dashboard_template.html
+      - dashboards/platform_governance/quality_dashboard_template.html
+      - dashboards/platform_governance/cost_dashboard_template.html
+      - dashboards/platform_governance/chatbot_cost_dashboard_template.html
       - shared/report_common.py
       - shared/branding.py
       - shared/assets/caffe_nero_logo.png
-      - dashboards/cost_reports/requirements.txt
-    title: "Cost Reports"
-
-  security_governance_report:
-    type: streamlit
-    identifier: {name: SECURITY_GOVERNANCE_REPORT, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
-    stage: streamlit_stage
-    query_warehouse: NERO_BI_WH
-    main_file: dashboards/security_governance_report/security_report.py
-    artifacts:
-      - dashboards/security_governance_report/security_report.py
-      - dashboards/security_governance_report/security_dashboard_template.html
-      - shared/report_common.py
-      - shared/branding.py
-      - shared/assets/caffe_nero_logo.png
-      - dashboards/security_governance_report/requirements.txt
-    title: "Security & Horizon Governance Report"
-
-  pipeline_health:
-    type: streamlit
-    identifier: {name: PIPELINE_HEALTH, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
-    stage: streamlit_stage
-    query_warehouse: NERO_BI_WH
-    main_file: dashboards/pipeline_health/pipeline_health.py
-    artifacts:
-      - dashboards/pipeline_health/pipeline_health.py
-      - dashboards/pipeline_health/pipeline_health_template.html
-      - shared/report_common.py
-      - shared/branding.py
-      - shared/assets/caffe_nero_logo.png
-      - dashboards/pipeline_health/requirements.txt
-    title: "Pipeline Health"
+      - dashboards/platform_governance/requirements.txt
+    title: "Platform Governance"
 
   # ---------------- chatbots (NERO_GOVERNANCE.APPS_CHATBOTS) ----------------
   nero_assistant:
