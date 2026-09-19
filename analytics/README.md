@@ -7,7 +7,7 @@ landing tables (`NERO_DB."00_STAGING"`) -- **DCM and dbt never manage the
 same fully qualified table.** This is a rename/restructure of what used
 to be a 2-layer split (DCM: bronze+silver via PROCESS_BATCH; dbt: staging
 onward) -- PROCESS_BATCH is retired (see `../sources/definitions/
-ingestion/engine.sql`), and the layer names shifted: what was "bronze"
+README.md`), and the layer names shifted: what was "bronze"
 (raw landing) is now "staging"; what was "silver" (validated, then
 dbt-owned after PROCESS_BATCH's retirement) is now "bronze"; what was
 dbt's own "staging" (stg_* views) is now "silver".
