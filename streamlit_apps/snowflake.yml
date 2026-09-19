@@ -1,28 +1,32 @@
 definition_version: "2"
 entities:
   # ---------------- dashboards (NERO_GOVERNANCE.APPS_DASHBOARDS) ----------------
-  loyalty_trading_pulse:
+  loyalty_engagement_sales:
+    # Renamed from loyalty_trading_pulse; rebuilt around the exercise's
+    # Part 4 brief -- 3 sections, one per stakeholder question -- and
+    # fixed to read "01_BRONZE" (was querying the retired "01_SILVER"/
+    # VALIDATED_* schema after the Staging/Bronze/Silver rename).
     type: streamlit
-    identifier: {name: LOYALTY_TRADING_PULSE, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
+    identifier: {name: LOYALTY_ENGAGEMENT_SALES, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
     query_warehouse: NERO_BI_WH
-    main_file: dashboards/loyalty_trading_pulse/loyalty_trading_pulse.py
+    main_file: dashboards/loyalty_engagement_sales/loyalty_engagement_sales.py
     artifacts:
-      - dashboards/loyalty_trading_pulse/loyalty_trading_pulse.py
-      - dashboards/loyalty_trading_pulse/dashboard_template.html
+      - dashboards/loyalty_engagement_sales/loyalty_engagement_sales.py
+      - dashboards/loyalty_engagement_sales/dashboard_template.html
       - shared/branding.py
       - shared/assets/caffe_nero_logo.png
-    title: "Loyalty & Trading Pulse"
+    title: "Loyalty Engagement & Sales"
 
   platform_governance:
-    # Replaces the 3 separate entities this used to be (cost_reports,
-    # security_governance_report, pipeline_health) -- one app, five tabs
-    # (Pipeline Health, Security & Governance, Data Quality, Platform
-    # Cost, Chatbot Cost). Deploying this entity with --replace overwrites
-    # the existing PLATFORM_GOVERNANCE object if already deployed; the 3
-    # old objects (COST_REPORTS, SECURITY_GOVERNANCE_REPORT,
-    # PIPELINE_HEALTH) are separate objects this doesn't touch and must be
-    # dropped explicitly once this is verified live.
+    # Replaces the 4 separate entities this used to be (cost_reports,
+    # security_governance_report, pipeline_health, and now
+    # chatbot_security_report) -- one app, six tabs (Pipeline Health,
+    # Security & Governance, Data Quality, Platform Cost, Chatbot Cost,
+    # Chatbot Security). Deploying this entity with --replace overwrites
+    # the existing PLATFORM_GOVERNANCE object if already deployed; the old
+    # standalone objects are separate objects this doesn't touch and must
+    # be dropped explicitly once each merge is verified live.
     type: streamlit
     identifier: {name: PLATFORM_GOVERNANCE, schema: APPS_DASHBOARDS, database: NERO_GOVERNANCE}
     stage: streamlit_stage
@@ -36,6 +40,7 @@ entities:
       - dashboards/platform_governance/quality_dashboard_template.html
       - dashboards/platform_governance/cost_dashboard_template.html
       - dashboards/platform_governance/chatbot_cost_dashboard_template.html
+      - dashboards/platform_governance/chatbot_security_dashboard_template.html
       - shared/report_common.py
       - shared/branding.py
       - shared/assets/caffe_nero_logo.png
@@ -72,21 +77,6 @@ entities:
       - shared/assets/caffe_nero_logo.png
       - chatbots/nero_governance_assistant/requirements.txt
     title: "Nero Governance Assistant"
-
-  chatbot_security_report:
-    type: streamlit
-    identifier: {name: CHATBOT_SECURITY_GOVERNANCE_REPORT, schema: APPS_CHATBOTS, database: NERO_GOVERNANCE}
-    stage: streamlit_stage
-    query_warehouse: NERO_BI_WH
-    main_file: chatbots/chatbot_security_report/chatbot_security_report.py
-    artifacts:
-      - chatbots/chatbot_security_report/chatbot_security_report.py
-      - chatbots/chatbot_security_report/chatbot_security_dashboard_template.html
-      - shared/report_common.py
-      - shared/branding.py
-      - shared/assets/caffe_nero_logo.png
-      - chatbots/chatbot_security_report/requirements.txt
-    title: "Chatbot Security Governance Report"
 
   # ---------------- leaders (NERO_GOVERNANCE.APPS_LEADERS) ----------------
   marketing_assistant:

@@ -1,8 +1,9 @@
 """Platform Governance — the one combined Streamlit-in-Snowflake app.
-Replaces four previously separate apps (Pipeline Health, Security &
-Horizon Governance Report, and the already-combined Cost Reports app,
-which itself used to be two) with a single app, five tabs -- one
-dashboard, not several dashboards that each happen to have tabs.
+Replaces five previously separate apps (Pipeline Health, Security &
+Horizon Governance Report, Chatbot Security Governance Report, and the
+already-combined Cost Reports app, which itself used to be two) with a
+single app, six tabs -- one dashboard, not several dashboards that each
+happen to have tabs.
 
 Tab 1 (Pipeline Health): end-to-end orchestration status -- staging
 landing -> dbt transform -> what's live in each layer. Updated for the
@@ -28,6 +29,13 @@ nero_assistant.py calls the Cortex Agent lite-run API with inline tools
 rather than referencing NERO_PLATFORM_AGENT by name, so
 CORTEX_AGENT_USAGE_HISTORY's AGENT_NAME column is always null for its
 traffic.
+
+Tab 6 (Chatbot Security): folded in from the standalone
+chatbot_security_report.py app -- who can reach the Nero Assistant's
+tools (MCP server, agent, search service, semantic view), who has
+actually called them, and whether the MCP server is registered and live.
+Distinct from Tab 2's account-wide Security & Governance view: this one
+is scoped to the chatbot's own attack surface.
 """
 import calendar
 import json
@@ -900,7 +908,116 @@ def build_chatbot_excel(d: dict) -> bytes:
 
 
 # ==================================================================
-# Render: five tabs, one app
+# Tab 6: Chatbot Security
+# ==================================================================
+
+CHATBOT_OBJECT_NAMES = [
+    "NERO_PLATFORM_AGENT", "NERO_PLATFORM_MCP_SERVER",
+    "FINDINGS_SEARCH_SVC", "LOYALTY_SEMANTIC_VIEW", "GOVERNANCE_SEMANTIC_VIEW",
+]
+
+
+@st.cache_data(ttl=120)
+def load_chatbot_security_data():
+    placeholders = ", ".join("?" for _ in CHATBOT_OBJECT_NAMES)
+    grant_rows_raw = session.sql(
+        f"""SELECT OBJECT_NAME, GRANTED_ON, PRIVILEGE, ROLE_NAME
+            FROM {GOV}.SECURITY.ROLE_GRANTS_INVENTORY
+            WHERE OBJECT_NAME IN ({placeholders})
+            ORDER BY OBJECT_NAME, ROLE_NAME""",
+        params=CHATBOT_OBJECT_NAMES,
+    ).collect()
+    grants = [
+        {"object_name": r["OBJECT_NAME"], "object_type": r["GRANTED_ON"],
+         "privilege": r["PRIVILEGE"], "grantee": r["ROLE_NAME"]}
+        for r in grant_rows_raw
+    ]
+
+    mcp_rows = rows(f"SELECT SERVER_NAME FROM {GOV}.SECURITY.MCP_SERVER_REGISTRY WHERE IS_DISABLED = FALSE")
+    mcp_registered = any(r["SERVER_NAME"] == "NERO_PLATFORM_MCP_SERVER" for r in mcp_rows)
+
+    mcp_log_rows = rows(f"SELECT * FROM {GOV}.SECURITY.MCP_TOOL_CALL_LOG LIMIT 100")
+    mcp_log = [
+        {"timestamp": str(r["TIMESTAMP"]), "tool_name": r["TOOL_NAME"], "user_name": r["USER_NAME"],
+         "role_name": r["ROLE_NAME"], "status": r["STATUS"]}
+        for r in mcp_log_rows
+    ]
+
+    login_rows = rows("""
+        SELECT EVENT_TIMESTAMP, USER_NAME, IS_SUCCESS, REPORTED_CLIENT_TYPE
+        FROM SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY
+        WHERE EVENT_TIMESTAMP >= DATEADD('day', -30, CURRENT_TIMESTAMP())
+          AND (USER_NAME IN ('NERO_COPILOT_USER', 'NERO_BI_USER') OR USER_NAME ILIKE 'STPLATSTREAMLIT%')
+        ORDER BY EVENT_TIMESTAMP DESC
+        LIMIT 200
+    """)
+    logins = [
+        {"event_timestamp": str(r["EVENT_TIMESTAMP"]), "user_name": r["USER_NAME"],
+         "is_success": r["IS_SUCCESS"], "client_type": r["REPORTED_CLIENT_TYPE"]}
+        for r in login_rows
+    ]
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mcp_registered": mcp_registered,
+        "grants": grants,
+        "mcp_log": mcp_log,
+        "logins": logins,
+    }
+
+
+def build_chatbot_security_pdf(d: dict) -> bytes:
+    grant_rows = [[g["object_name"], g["object_type"], g["privilege"], g["grantee"]] for g in d["grants"]] or [["—", "—", "—", "No grants found"]]
+    mcp_rows = [[r["timestamp"][:19], r["tool_name"], r["user_name"], r["status"]] for r in d["mcp_log"]] or [["—", "—", "—", "No MCP tool calls logged yet"]]
+    login_rows = [[r["event_timestamp"][:19], r["user_name"], r["is_success"]] for r in d["logins"]] or [["—", "—", "No chatbot-identity logins in 30 days"]]
+
+    expected_grantees = ("ACCOUNTADMIN", "NERO_BI_ROLE", "NERO_GOVERNANCE_ROLE", "NERO_COPILOT_ROLE")
+    nonstandard = [g for g in d["grants"] if g["grantee"] not in expected_grantees and g["privilege"] != "OWNERSHIP"]
+
+    sections = [
+        ("Executive Summary", [
+            rc.body(f"MCP server status: <b>{'Registered and live' if d['mcp_registered'] else 'NOT FOUND'}</b>."),
+            rc.body(f"{len(d['grants'])} grant(s) found on the four chatbot objects (agent, MCP server, search service, semantic view)."
+                     + (f" <b>{len(nonstandard)} unexpected grantee(s)</b> outside ACCOUNTADMIN/NERO_BI_ROLE/NERO_COPILOT_ROLE." if nonstandard else " All grantees match the expected three roles.")),
+            rc.body(f"{len(d['mcp_log'])} MCP tool call(s) logged; {len(d['logins'])} login(s) from chatbot-related identities in the last 30 days."),
+            rc.caption("Access review reads NERO_GOVERNANCE.SECURITY.ROLE_GRANTS_INVENTORY (an ACCOUNT_USAGE.GRANTS_TO_ROLES wrapper, lags up to a few hours), not live SHOW GRANTS ON."),
+        ]),
+        ("1. Access to Chatbot Tools", [
+            rc.styled_table(["Object", "Type", "Privilege", "Granted To"], grant_rows, col_widths=[150, 110, 80, 130]),
+        ]),
+        ("2. MCP Tool-Call Audit Log", [
+            rc.styled_table(["Time", "Tool", "User", "Status"], mcp_rows, col_widths=[110, 130, 110, 110]),
+        ]),
+        ("3. Chatbot-Related Logins, Last 30 Days", [
+            rc.styled_table(["Time", "User", "Success"], login_rows, col_widths=[130, 160, 100]),
+        ]),
+    ]
+    return rc.build_pdf(
+        report_title="Chatbot Security Governance Report",
+        report_subtitle="Nero Platform — access, MCP audit log and login activity for the Nero Assistant chatbot",
+        prepared_for="Platform Engineering",
+        sections=sections,
+    )
+
+
+def build_chatbot_security_excel(d: dict) -> bytes:
+    sheets = {
+        "Access Grants": pd.DataFrame(d["grants"] or [{"object_name": "", "object_type": "", "privilege": "", "grantee": ""}])
+            .rename(columns={"object_name": "Object", "object_type": "Type", "privilege": "Privilege", "grantee": "Granted To"}),
+        "MCP Tool Calls": pd.DataFrame(d["mcp_log"] or [{"timestamp": "", "tool_name": "", "user_name": "", "role_name": "", "status": ""}])
+            .rename(columns={"timestamp": "Time", "tool_name": "Tool", "user_name": "User", "role_name": "Role", "status": "Status"}),
+        "Chatbot Logins": pd.DataFrame(d["logins"] or [{"event_timestamp": "", "user_name": "", "is_success": "", "client_type": ""}])
+            .rename(columns={"event_timestamp": "Time", "user_name": "User", "is_success": "Success", "client_type": "Client"}),
+    }
+    return rc.write_excel_workbook(
+        title="Chatbot Security Governance Report",
+        subtitle="Nero Platform — access, MCP audit log and login activity for the Nero Assistant chatbot",
+        sheets=sheets,
+    )
+
+
+# ==================================================================
+# Render: six tabs, one app
 # ==================================================================
 
 today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -910,8 +1027,8 @@ security_data = load_security_data()
 security_data["logo_b64"] = branding.LOGO_B64
 quality_data = load_quality_data()
 
-tab_pipeline, tab_security, tab_quality, tab_cost, tab_chatbot_cost = st.tabs(
-    ["Pipeline Health", "Security & Governance", "Data Quality", "Platform Cost", "Chatbot Cost"]
+tab_pipeline, tab_security, tab_quality, tab_cost, tab_chatbot_cost, tab_chatbot_security = st.tabs(
+    ["Pipeline Health", "Security & Governance", "Data Quality", "Platform Cost", "Chatbot Cost", "Chatbot Security"]
 )
 
 with tab_pipeline:
@@ -1028,4 +1145,29 @@ with tab_chatbot_cost:
             file_name=f"nero_chatbot_cost_report_{today_str}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="chatbot_xlsx",
+        )
+
+with tab_chatbot_security:
+    chatbot_security_data = load_chatbot_security_data()
+    chatbot_security_data["logo_b64"] = branding.LOGO_B64
+    html6 = (Path(__file__).parent / "chatbot_security_dashboard_template.html").read_text().replace(
+        "__DATA_JSON__", json.dumps(chatbot_security_data)
+    )
+    components.html(html6, height=1700, scrolling=True)
+
+    st.divider()
+    st.subheader("Export")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            "Download PDF report", data=build_chatbot_security_pdf(chatbot_security_data),
+            file_name=f"nero_chatbot_security_report_{today_str}.pdf", mime="application/pdf",
+            key="chatbot_security_pdf",
+        )
+    with col2:
+        st.download_button(
+            "Download Excel workbook", data=build_chatbot_security_excel(chatbot_security_data),
+            file_name=f"nero_chatbot_security_report_{today_str}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="chatbot_security_xlsx",
         )

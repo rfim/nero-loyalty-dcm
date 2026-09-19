@@ -1,10 +1,17 @@
-"""Loyalty & Trading Pulse — native Streamlit-in-Snowflake dashboard.
+"""Loyalty Engagement & Sales — native Streamlit-in-Snowflake dashboard.
 
-Queries NERO_DB."01_SILVER" directly (the validated, contract-checked
-layer) rather than the dbt gold/SCD layer — the same choice made for the
-one-off analysis this page mirrors: tier is read as each customer's
-*current* tier, not reconstructed at each historical transaction, because
-the source has no tier-change history to do that precisely.
+Built for Part 4 of the exercise brief (store operations / marketing
+stakeholder), and structured section-by-section to answer its 3 questions
+directly: (1) which stores/regions lead or lag on loyalty engagement and
+whether that's changed recently, (2) how loyalty tier relates to basket
+size and visit frequency, (3) anything else in the data worth a
+stakeholder's attention.
+
+Queries NERO_DB."01_BRONZE" (the dbt-built, contract-filtered layer —
+renamed from "01_SILVER"/VALIDATED_* mid-project, see analytics/README.md)
+rather than the gold/SCD layer — tier is read as each customer's *current*
+tier, not reconstructed at each historical transaction, because the
+source has no tier-change history to do that precisely.
 
 The visual design (palette, type, chart drawing, hover tooltips) is kept
 byte-for-byte identical to the Claude Artifact version of this dashboard —
@@ -28,10 +35,10 @@ _sys.path.insert(0, str(_p / "shared"))
 
 import branding
 
-st.set_page_config(page_title="Loyalty & Trading Pulse", layout="wide")
+st.set_page_config(page_title="Loyalty Engagement & Sales", layout="wide")
 
 session = get_active_session()
-SILVER = 'NERO_DB."01_SILVER"'
+BRONZE = 'NERO_DB."01_BRONZE"'
 
 
 def one(sql: str):
@@ -46,34 +53,34 @@ def rows(sql: str):
 def load_dashboard_data():
     summary = one(f"""
         SELECT
-          (SELECT COUNT(*) FROM {SILVER}.VALIDATED_STORES)              AS N_STORES,
-          (SELECT COUNT(*) FROM {SILVER}.VALIDATED_LOYALTY_CUSTOMERS)   AS N_CUSTOMERS,
-          (SELECT COUNT(*) FROM {SILVER}.VALIDATED_TRANSACTIONS)        AS N_TRANSACTIONS,
-          (SELECT COUNT(*) FROM {SILVER}.VALIDATED_LOYALTY_EVENTS)      AS N_EVENTS,
-          (SELECT MIN(TRANSACTION_TS) FROM {SILVER}.VALIDATED_TRANSACTIONS) AS TXN_DATE_MIN,
-          (SELECT MAX(TRANSACTION_TS) FROM {SILVER}.VALIDATED_TRANSACTIONS) AS TXN_DATE_MAX,
-          (SELECT MIN(EVENT_TS) FROM {SILVER}.VALIDATED_LOYALTY_EVENTS)     AS EVENT_DATE_MIN,
-          (SELECT MAX(EVENT_TS) FROM {SILVER}.VALIDATED_LOYALTY_EVENTS)     AS EVENT_DATE_MAX,
-          (SELECT COUNT(*) FROM {SILVER}.VALIDATED_LOYALTY_CUSTOMERS)   AS TOTAL_SIGNUPS,
-          (SELECT COUNT_IF(EVENT_TYPE = 'earn') FROM {SILVER}.VALIDATED_LOYALTY_EVENTS)   AS TOTAL_EARNS,
-          (SELECT COUNT_IF(EVENT_TYPE = 'redeem') FROM {SILVER}.VALIDATED_LOYALTY_EVENTS) AS TOTAL_REDEEMS,
+          (SELECT COUNT(*) FROM {BRONZE}.BRONZE_STORES)              AS N_STORES,
+          (SELECT COUNT(*) FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS)   AS N_CUSTOMERS,
+          (SELECT COUNT(*) FROM {BRONZE}.BRONZE_TRANSACTIONS)        AS N_TRANSACTIONS,
+          (SELECT COUNT(*) FROM {BRONZE}.BRONZE_LOYALTY_EVENTS)      AS N_EVENTS,
+          (SELECT MIN(TRANSACTION_TS) FROM {BRONZE}.BRONZE_TRANSACTIONS) AS TXN_DATE_MIN,
+          (SELECT MAX(TRANSACTION_TS) FROM {BRONZE}.BRONZE_TRANSACTIONS) AS TXN_DATE_MAX,
+          (SELECT MIN(EVENT_TS) FROM {BRONZE}.BRONZE_LOYALTY_EVENTS)     AS EVENT_DATE_MIN,
+          (SELECT MAX(EVENT_TS) FROM {BRONZE}.BRONZE_LOYALTY_EVENTS)     AS EVENT_DATE_MAX,
+          (SELECT COUNT(*) FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS)   AS TOTAL_SIGNUPS,
+          (SELECT COUNT_IF(EVENT_TYPE = 'earn') FROM {BRONZE}.BRONZE_LOYALTY_EVENTS)   AS TOTAL_EARNS,
+          (SELECT COUNT_IF(EVENT_TYPE = 'redeem') FROM {BRONZE}.BRONZE_LOYALTY_EVENTS) AS TOTAL_REDEEMS,
           (SELECT DIV0(COUNT_IF(EVENT_TYPE = 'redeem'), COUNT_IF(EVENT_TYPE = 'earn'))
-             FROM {SILVER}.VALIDATED_LOYALTY_EVENTS)                    AS OVERALL_RR,
+             FROM {BRONZE}.BRONZE_LOYALTY_EVENTS)                    AS OVERALL_RR,
           (SELECT DIV0(COUNT_IF(CUSTOMER_ID IS NOT NULL), COUNT(*))
-             FROM {SILVER}.VALIDATED_TRANSACTIONS)                      AS LOYALTY_TXN_SHARE,
-          (SELECT COUNT(DISTINCT REWARD_ID) FROM {SILVER}.VALIDATED_LOYALTY_EVENTS
+             FROM {BRONZE}.BRONZE_TRANSACTIONS)                      AS LOYALTY_TXN_SHARE,
+          (SELECT COUNT(DISTINCT REWARD_ID) FROM {BRONZE}.BRONZE_LOYALTY_EVENTS
              WHERE REWARD_ID IS NOT NULL)                               AS N_DISTINCT_REWARDS,
-          (SELECT AVG(BASKET_TOTAL) FROM {SILVER}.VALIDATED_TRANSACTIONS) AS AVG_BASKET_ALL
+          (SELECT AVG(BASKET_TOTAL) FROM {BRONZE}.BRONZE_TRANSACTIONS) AS AVG_BASKET_ALL
     """)
 
     store_rows = rows(f"""
-        WITH bounds AS (SELECT MAX(EVENT_TS) AS max_ts FROM {SILVER}.VALIDATED_LOYALTY_EVENTS),
+        WITH bounds AS (SELECT MAX(EVENT_TS) AS max_ts FROM {BRONZE}.BRONZE_LOYALTY_EVENTS),
         ev AS (
           SELECT e.STORE_ID, e.EVENT_TYPE,
             CASE WHEN e.EVENT_TS > DATEADD(day, -28, b.max_ts) THEN 'recent'
                  WHEN e.EVENT_TS > DATEADD(day, -56, b.max_ts) THEN 'prior'
                  ELSE 'older' END AS win
-          FROM {SILVER}.VALIDATED_LOYALTY_EVENTS e, bounds b
+          FROM {BRONZE}.BRONZE_LOYALTY_EVENTS e, bounds b
         ),
         agg AS (
           SELECT STORE_ID,
@@ -87,7 +94,7 @@ def load_dashboard_data():
         ),
         signups AS (
           SELECT HOME_STORE_ID AS STORE_ID, COUNT(*) AS signups
-          FROM {SILVER}.VALIDATED_LOYALTY_CUSTOMERS GROUP BY HOME_STORE_ID
+          FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS GROUP BY HOME_STORE_ID
         )
         SELECT s.STORE_ID AS STORE_ID, s.STORE_NAME AS NAME, s.REGION AS REGION, s.FORMAT AS FORMAT,
           COALESCE(g.signups, 0) AS SIGNUPS,
@@ -96,7 +103,7 @@ def load_dashboard_data():
           DIV0(a.redeems, a.earns)               AS RR,
           DIV0(a.redeems_recent, a.earns_recent)  AS RR_RECENT,
           DIV0(a.redeems_prior, a.earns_prior)    AS RR_PRIOR
-        FROM {SILVER}.VALIDATED_STORES s
+        FROM {BRONZE}.BRONZE_STORES s
         LEFT JOIN agg a ON a.STORE_ID = s.STORE_ID
         LEFT JOIN signups g ON g.STORE_ID = s.STORE_ID
         ORDER BY RR DESC
@@ -107,15 +114,15 @@ def load_dashboard_data():
     region_rows = rows(f"""
         WITH signups AS (
           SELECT s.REGION, COUNT(*) AS signups
-          FROM {SILVER}.VALIDATED_LOYALTY_CUSTOMERS c
-          JOIN {SILVER}.VALIDATED_STORES s ON s.STORE_ID = c.HOME_STORE_ID
+          FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS c
+          JOIN {BRONZE}.BRONZE_STORES s ON s.STORE_ID = c.HOME_STORE_ID
           GROUP BY s.REGION
         ),
         rr AS (
           SELECT s.REGION,
             DIV0(COUNT_IF(e.EVENT_TYPE = 'redeem'), COUNT_IF(e.EVENT_TYPE = 'earn')) AS rr
-          FROM {SILVER}.VALIDATED_LOYALTY_EVENTS e
-          JOIN {SILVER}.VALIDATED_STORES s ON s.STORE_ID = e.STORE_ID
+          FROM {BRONZE}.BRONZE_LOYALTY_EVENTS e
+          JOIN {BRONZE}.BRONZE_STORES s ON s.STORE_ID = e.STORE_ID
           GROUP BY s.REGION
         )
         SELECT g.REGION AS REGION, g.signups AS SIGNUPS, r.rr AS RR
@@ -126,12 +133,12 @@ def load_dashboard_data():
     segment_rows = rows(f"""
         WITH bounds AS (
           SELECT DATEDIFF('day', MIN(TRANSACTION_TS), MAX(TRANSACTION_TS)) + 1 AS days
-          FROM {SILVER}.VALIDATED_TRANSACTIONS
+          FROM {BRONZE}.BRONZE_TRANSACTIONS
         ),
         txn AS (
           SELECT t.CUSTOMER_ID, t.BASKET_TOTAL, COALESCE(c.TIER, 'Walk-in') AS segment
-          FROM {SILVER}.VALIDATED_TRANSACTIONS t
-          LEFT JOIN {SILVER}.VALIDATED_LOYALTY_CUSTOMERS c ON c.CUSTOMER_ID = t.CUSTOMER_ID
+          FROM {BRONZE}.BRONZE_TRANSACTIONS t
+          LEFT JOIN {BRONZE}.BRONZE_LOYALTY_CUSTOMERS c ON c.CUSTOMER_ID = t.CUSTOMER_ID
         )
         SELECT segment AS SEGMENT,
           COUNT(*) AS TRANSACTIONS,

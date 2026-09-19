@@ -11,7 +11,11 @@
 --     SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY,
 --     SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY,
 --     SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY
---   - CHATBOT_SECURITY_GOVERNANCE_REPORT: SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY
+--   - PLATFORM_GOVERNANCE's Chatbot Security tab (formerly the standalone
+--     CHATBOT_SECURITY_GOVERNANCE_REPORT app, folded in): also
+--     SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY, and TASK_HISTORY (Pipeline
+--     Health tab) -- same grant, no new one needed since this app was
+--     already NERO_GOVERNANCE_ROLE-owned.
 --
 -- These apps worked before the streamlit_apps ownership fix only because
 -- they ran under ACCOUNTADMIN (which gets this access implicitly) --
@@ -25,7 +29,7 @@
 -- NERO_GOVERNANCE.SECURITY.* wrapper views (ROLE_GRANTS_INVENTORY,
 -- LOGIN_ACTIVITY_DAILY, etc.), which already carry their own access to
 -- the underlying ACCOUNT_USAGE views via their owner. NERO_BI_ROLE's apps
--- (LOYALTY_TRADING_PULSE, NERO_ASSISTANT) don't touch ACCOUNT_USAGE /
+-- (LOYALTY_ENGAGEMENT_SALES, NERO_ASSISTANT) don't touch ACCOUNT_USAGE /
 -- ORGANIZATION_USAGE at all, so NERO_BI_ROLE doesn't need this grant.
 --
 -- Idempotent: safe to re-run. Apply with:

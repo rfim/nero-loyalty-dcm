@@ -64,7 +64,7 @@ ALTER TABLE NERO_GOVERNANCE.CORTEX_TOOLS.CHAT_MESSAGES
 -- schema now gets USAGE + CREATE STREAMLIT scoped to just the schema(s)
 -- holding the apps it actually owns (confirmed live via
 -- SHOW STREAMLITS IN SCHEMA ... across all three new schemas):
---   NERO_BI_ROLE         -> APPS_DASHBOARDS (LOYALTY_TRADING_PULSE),
+--   NERO_BI_ROLE         -> APPS_DASHBOARDS (LOYALTY_ENGAGEMENT_SALES),
 --                           APPS_CHATBOTS (NERO_ASSISTANT)
 --   NERO_GOVERNANCE_ROLE -> APPS_DASHBOARDS (COST_GOVERNANCE_REPORT,
 --                           SECURITY_GOVERNANCE_REPORT),
@@ -169,7 +169,7 @@ GRANT SELECT, INSERT ON TABLE NERO_GOVERNANCE.APPS_CHATBOTS.CHAT_MESSAGES TO ROL
 -- to assign a specific owning role is to deploy via a `snow` CLI connection
 -- already authenticated as that role). Redeploying all 17 apps as part of
 -- this reorg fixed that as a side effect:
---   LOYALTY_TRADING_PULSE, CHATBOT_COST_GOVERNANCE_REPORT,
+--   LOYALTY_ENGAGEMENT_SALES, CHATBOT_COST_GOVERNANCE_REPORT,
 --   CHATBOT_SECURITY_GOVERNANCE_REPORT -> now NERO_BI_ROLE / NERO_GOVERNANCE_ROLE
 --   COST_GOVERNANCE_REPORT, SECURITY_GOVERNANCE_REPORT -> now NERO_GOVERNANCE_ROLE
 -- No further grants needed here -- this note just documents the change for
