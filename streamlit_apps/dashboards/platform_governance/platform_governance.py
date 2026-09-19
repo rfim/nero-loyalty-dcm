@@ -76,7 +76,7 @@ def one(sql: str):
 # ==================================================================
 
 INGEST_SCHEDULE = "06:00 UTC daily"
-DBT_REFRESH_SCHEDULE = "06:15 UTC daily"
+DBT_REFRESH_SCHEDULE = "after both ingestion tasks succeed"
 TASK_STATE_KIND = {"SUCCEEDED": "good", "SCHEDULED": "warn", "EXECUTING": "warn",
                     "FAILED": "crit", "CANCELLED": "crit", "SKIPPED": "warn"}
 

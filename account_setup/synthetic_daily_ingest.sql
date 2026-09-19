@@ -186,11 +186,10 @@ def run(session):
     }
 $$;
 
-CREATE OR REPLACE TASK NERO_DB."02_CONTROL".SYNTHETIC_DAILY_INGEST_TASK
-  WAREHOUSE = 'NERO_LOAD_WH'
-  SCHEDULE = 'USING CRON 0 6 * * * UTC'
-  COMMENT = 'Runs GENERATE_SYNTHETIC_DAY() once daily. Temporary stand-in for a real data feed -- safe to SUSPEND at any time. See account_setup/synthetic_daily_ingest.sql.'
-AS
-  CALL NERO_DB."02_CONTROL".GENERATE_SYNTHETIC_DAY();
-
-ALTER TASK NERO_DB."02_CONTROL".SYNTHETIC_DAILY_INGEST_TASK RESUME;
+-- SYNTHETIC_DAILY_INGEST_TASK is no longer created here. It now lives in
+-- NERO_ANALYTICS.DBT_PROJECT (owned by NERO_DBT_ROLE, alongside
+-- GOOGLE_SHEETS_INGEST_TASK and DBT_DAILY_REFRESH_TASK) so it can be the
+-- root of a real Snowflake task DAG -- dbt build now runs strictly after
+-- both ingestion tasks succeed, not at a fixed cron offset. This
+-- procedure is unchanged and still called by that task. See
+-- account_setup/daily_pipeline_orchestration.sql.

@@ -133,19 +133,14 @@ def run(session):
     }
 $$;
 
--- Automatic trigger: daily, matching the cadence every other feed in this
--- pipeline uses. Manual trigger is just CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS()
--- directly -- the same procedure serves both, same duality real Snowpipe
--- offers between auto-ingest and REST-triggered runs.
-CREATE OR REPLACE TASK NERO_DB."02_CONTROL".GOOGLE_SHEETS_INGEST_TASK
-  WAREHOUSE = 'NERO_LOAD_WH'
-  SCHEDULE = 'USING CRON 30 6 * * * UTC'
-  COMMENT = 'Automatic trigger for INGEST_FROM_GOOGLE_SHEETS(). Manual trigger: CALL the procedure directly. See account_setup/google_sheets_ingest.sql.'
-AS
-  CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS();
+-- Automatic trigger: GOOGLE_SHEETS_INGEST_TASK in
+-- NERO_ANALYTICS.DBT_PROJECT (account_setup/daily_pipeline_orchestration.sql),
+-- part of the daily pipeline DAG. Manual trigger is just
+-- CALL NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS() directly -- the same
+-- procedure serves both.
 
-ALTER TASK NERO_DB."02_CONTROL".GOOGLE_SHEETS_INGEST_TASK RESUME;
-
--- Let the ingestion role trigger this manually too, not just ACCOUNTADMIN.
+-- Let the ingestion role trigger this manually too, not just ACCOUNTADMIN
+-- (NERO_DBT_ROLE's own USAGE grant, for the scheduled task, is in
+-- account_setup/daily_pipeline_orchestration.sql).
 GRANT USAGE ON INTEGRATION NERO_GOOGLE_SHEETS_ACCESS_INTEGRATION TO ROLE NERO_INGEST_ROLE;
 GRANT USAGE ON PROCEDURE NERO_DB."02_CONTROL".INGEST_FROM_GOOGLE_SHEETS() TO ROLE NERO_INGEST_ROLE;
