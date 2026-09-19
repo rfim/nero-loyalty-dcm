@@ -19,8 +19,9 @@ DATASETS_DIR = CONTRACT_DIR / "datasets"
 
 ALLOWED = {
     "meta": {"version", "contract_id", "wire_format", "ingestion", "freshness"},
-    "ingestion": {"source", "landing"},
-    "source": {"type", "file_pattern", "on_error", "internal_stage", "s3"},
+    "ingestion": {"sources", "landing"},
+    "source": {"name", "type", "status", "datasets", "schedule", "file_pattern", "on_error",
+               "internal_stage", "s3", "google_sheets", "synthetic"},
     "landing": {"type", "manifest_table_name", "dataset_table_prefix", "iceberg"},
     "dataset": {"primary_key", "owners", "columns", "policies"},
     "column": {"type", "nullable", "max_length", "enum", "foreign_key", "precision", "scale",
@@ -51,7 +52,15 @@ def load_contract():
     meta = yaml.safe_load(meta_bytes)
     _check_keys(meta, "meta", "meta.yaml")
     _check_keys(meta["ingestion"], "ingestion", "meta.yaml:ingestion")
-    _check_keys(meta["ingestion"]["source"], "source", "meta.yaml:ingestion.source")
+    sources = meta["ingestion"]["sources"]
+    if not sources:
+        sys.exit("contract: meta.yaml:ingestion.sources is empty — refusing to load")
+    seen_names = set()
+    for src in sources:
+        _check_keys(src, "source", f"meta.yaml:ingestion.sources[{src.get('name', '?')}]")
+        if src["name"] in seen_names:
+            sys.exit(f"contract: duplicate source name '{src['name']}' in meta.yaml:ingestion.sources")
+        seen_names.add(src["name"])
     _check_keys(meta["ingestion"]["landing"], "landing", "meta.yaml:ingestion.landing")
 
     dataset_files = sorted(DATASETS_DIR.glob("*.yaml"))

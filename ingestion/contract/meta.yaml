@@ -1,4 +1,4 @@
-version: 6
+version: 7
 contract_id: nero_loyalty_contract
 wire_format: nero_snapshot_v2
 
@@ -7,9 +7,16 @@ wire_format: nero_snapshot_v2
 # STAGING_<DATASET> table (columns/types generated straight from this
 # contract, same as BRONZE_<DATASET>) plus one STAGING_BATCH_MANIFESTS
 # table carrying batch-level metadata -- readable by design, not a shared
-# JSON envelope table. Only source.type=internal_stage is deployed/tested --
-# the s3 block is schema-valid and the generator emits real SQL for it, but
-# it's UNVERIFIED (no live AWS credentials in this account).
+# JSON envelope table.
+#
+# ingestion.sources is a list, not a single object: every mechanism that
+# can land data into staging is declared here, whether or not it is
+# currently deployed. This is the single place to look up, or change,
+# where a dataset actually comes from -- previously the Google Sheets URLs
+# and the synthetic generator lived only in their own account_setup/
+# scripts, undeclared anywhere the contract could be checked against.
+# `status: deployed` sources have a real generated/hand-written definition
+# applied live; `status: unverified` or `status: reference` do not.
 #
 # NERO_DB is split into numbered schemas by pipeline stage (see
 # ingestion/build.py's schema constants) — staging objects below live in
@@ -17,19 +24,59 @@ wire_format: nero_snapshot_v2
 # full Staging/Bronze/Silver rename mapping). Quoted because Snowflake
 # requires quoting an identifier starting with a digit.
 ingestion:
-  source:
-    type: internal_stage          # internal_stage | s3
-    file_pattern: ".*[.]csv"
-    on_error: ABORT_STATEMENT
-    internal_stage:
-      stage_name: 'NERO_DB."00_STAGING".LANDING_STAGE'
-    s3:
-      stage_name: 'NERO_DB."00_STAGING".S3_STAGE'
-      integration_name: NERO_S3_INTEGRATION
-      bucket_url: "s3://REPLACE_BUCKET/nero/"
-      aws_role_arn: "arn:aws:iam::123456789012:role/REPLACE_ROLE"
-      auto_ingest: true
-      pipe_name: 'NERO_DB."00_STAGING".CONTRACT_PIPE'
+  sources:
+    - name: csv_upload
+      type: internal_stage
+      status: deployed
+      datasets: [stores, loyalty_customers, transactions, loyalty_events]
+      file_pattern: ".*[.]csv"
+      on_error: ABORT_STATEMENT
+      internal_stage:
+        stage_name: 'NERO_DB."00_STAGING".LANDING_STAGE'
+
+    - name: google_sheets_feed
+      type: google_sheets
+      status: deployed
+      datasets: [stores, loyalty_customers, transactions, loyalty_events]
+      schedule: "06:00 UTC daily"
+      google_sheets:
+        # Public Sheets CSV exports. Generator embeds these URLs directly
+        # into the fetch procedure (ingestion/generated/google_sheets_
+        # procedure.sql) -- Snowflake stored procedures cannot read repo
+        # files at runtime, so this is the one place to edit a URL; rerun
+        # `python ingestion/build.py` and redeploy the generated file.
+        urls:
+          stores: "https://docs.google.com/spreadsheets/d/1HT5vSoVp-SIU-3-W_og2LxSfStEWjRvy1mEHNdjlTpM/export?format=csv"
+          loyalty_customers: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgZnkCztREaCPDx4ah2CEcOmPtcpTzyPfO9fv13XPXY_fcLwZdXNuC7X7ydzVh8E-s1XtPMtPuvQ1R/pub?output=csv"
+          transactions: "https://docs.google.com/spreadsheets/d/1ZI9ceDcvdremwa_GJLtKB25vfqnKCAFDs0eaVWoWBz0/export?format=csv"
+          loyalty_events: "https://docs.google.com/spreadsheets/d/1pjipgssqwx5Ojg3CxEYK1ACU6EpGz9TyX0tFVJp3P0U/export?format=csv"
+
+    - name: synthetic_generator
+      type: synthetic
+      status: temporary
+      datasets: [stores, loyalty_customers, transactions, loyalty_events]
+      schedule: "06:00 UTC daily"
+      # No location config -- this is a random-data generator, not a feed
+      # with an address. Declared here so the contract still names every
+      # mechanism that can write to staging, even one with nothing to
+      # point at; see account_setup/synthetic_daily_ingest.sql for why it
+      # is temporary and not DCM-managed.
+      synthetic: {}
+
+    - name: s3_feed
+      type: s3
+      status: unverified   # no live AWS credentials in this account to test against
+      datasets: [stores, loyalty_customers, transactions, loyalty_events]
+      file_pattern: ".*[.]csv"
+      on_error: ABORT_STATEMENT
+      s3:
+        stage_name: 'NERO_DB."00_STAGING".S3_STAGE'
+        integration_name: NERO_S3_INTEGRATION
+        bucket_url: "s3://REPLACE_BUCKET/nero/"
+        aws_role_arn: "arn:aws:iam::123456789012:role/REPLACE_ROLE"
+        auto_ingest: true
+        pipe_name: 'NERO_DB."00_STAGING".CONTRACT_PIPE'
+
   landing:
     type: typed                   # typed | iceberg
     manifest_table_name: 'NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS'

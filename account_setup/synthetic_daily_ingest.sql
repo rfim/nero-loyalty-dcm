@@ -12,9 +12,12 @@
 --   ALTER TASK NERO_ANALYTICS.DBT_PROJECT.DBT_DAILY_REFRESH_TASK SUSPEND;
 --   DROP TASK/PROCEDURE ... (optional, once a real feed replaces this)
 --
--- Not DCM-managed (unlike sources/definitions/README.md) --
+-- Not DCM-managed, unlike sources/definitions/ (see its own README) --
 -- deliberately kept out of the core contract-managed pipeline since it's
--- expected to be temporary.
+-- expected to be temporary. Declared in the contract as source
+-- 'synthetic_generator' (ingestion/contract/meta.yaml) so it is at least
+-- named alongside every other source, even without a DCM-deployed
+-- definition of its own -- see the contract's own note on why.
 --
 -- Lands into staging only -- validation/publish into bronze is now dbt's
 -- job (analytics/models/bronze/), triggered by DBT_DAILY_REFRESH_TASK, not
@@ -51,7 +54,7 @@ from datetime import datetime, timedelta, timezone
 from snowflake.snowpark.functions import col, lit, parse_json, seq8
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 6
+CONTRACT_VERSION = 7
 
 
 def _land(session, dataset, rows, columns, batch_id):
