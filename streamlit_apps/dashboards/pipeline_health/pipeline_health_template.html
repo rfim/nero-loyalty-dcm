@@ -251,13 +251,13 @@ document.getElementById('metaReleased').textContent = fmtDateTime(DATA.last_batc
 (function () {
   const overallKind = DATA.stages.some(s => s.kind === 'crit') ? 'crit'
     : DATA.stages.some(s => s.kind === 'warn' || s.kind === 'unknown') ? 'warn' : 'good';
-  const bronze = DATA.layers.find(l => l.layer === 'Raw landing (Bronze)');
-  const txn = DATA.layers.find(l => l.object === 'VALIDATED_TRANSACTIONS');
+  const staging = DATA.layers.find(l => l.layer === 'Raw landing (Staging)');
+  const txn = DATA.layers.find(l => l.object === 'BRONZE_TRANSACTIONS');
   const factTxn = DATA.layers.find(l => l.object === 'FACT_SALES_TRANSACTION');
   const kpis = [
     { label: 'Overall status', value: KIND_LABEL[overallKind], note: `${DATA.stages.length} pipeline stages checked` },
-    { label: 'Bronze rows landed', value: fmtInt(bronze ? bronze.count : null), note: 'NERO_DB."00_BRONZE"' },
-    { label: 'Transactions validated', value: fmtInt(txn ? txn.count : null), note: 'NERO_DB."01_SILVER"' },
+    { label: 'Staging rows landed', value: fmtInt(staging ? staging.count : null), note: 'NERO_DB."00_STAGING"' },
+    { label: 'Transactions in bronze', value: fmtInt(txn ? txn.count : null), note: 'NERO_DB."01_BRONZE"' },
     { label: 'Transactions in gold', value: fmtInt(factTxn ? factTxn.count : null), note: 'NERO_ANALYTICS."02_GOLD"' },
   ];
   document.getElementById('kpiRow').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="note">${k.note}</div></div>`).join('');
@@ -268,7 +268,7 @@ document.getElementById('metaReleased').textContent = fmtDateTime(DATA.last_batc
   renderBarChart(document.getElementById('chartLayers'), rowsData, {
     valueFn: r => r.count, labelFn: r => `${r.layer} · ${r.object}`, fmtFn: v => fmtInt(v),
     color: r => r.layer.startsWith('Raw') ? 'var(--series-1)'.replace('var(','').replace(')','')
-      : r.layer.startsWith('Validated') ? 'var(--series-2)'.replace('var(','').replace(')','')
+      : r.layer.startsWith('Contract-filtered') ? 'var(--series-2)'.replace('var(','').replace(')','')
       : 'var(--series-3)'.replace('var(','').replace(')',''),
   });
   document.getElementById('layersTable').innerHTML = `<thead><tr><th>Layer</th><th>Object</th><th>Row Count</th></tr></thead>

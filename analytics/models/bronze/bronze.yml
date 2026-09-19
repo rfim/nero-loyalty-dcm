@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: bronze_stores
+    description: "Staging->bronze, filtered by the store contract rules directly in SQL."
+    columns:
+      - name: store_id
+        tests: [not_null, unique]
+      - name: format
+        tests:
+          - accepted_values: {values: ["High street", "Drive-thru", "Travel"]}
+
+  - name: bronze_loyalty_customers
+    description: "Staging->bronze, filtered by the loyalty_customers contract rules directly in SQL."
+    columns:
+      - name: customer_id
+        tests: [not_null, unique]
+      - name: tier
+        tests:
+          - accepted_values: {values: ["Bronze", "Silver", "Gold"]}
+      - name: home_store_id
+        tests:
+          - relationships: {to: ref('bronze_stores'), field: store_id}
+
+  - name: bronze_loyalty_events
+    description: "Staging->bronze, filtered by the loyalty_events contract rules directly in SQL."
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: customer_id
+        tests:
+          - relationships: {to: ref('bronze_loyalty_customers'), field: customer_id}
+      - name: event_type
+        tests:
+          - accepted_values: {values: ["signup", "earn", "redeem", "tier_change"]}
+      - name: store_id
+        tests:
+          - relationships: {to: ref('bronze_stores'), field: store_id}
+
+  - name: bronze_transactions
+    description: "Staging->bronze, filtered by the transactions contract rules directly in SQL. Incremental -- only new rows merge in per run."
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: store_id
+        tests:
+          - relationships: {to: ref('bronze_stores'), field: store_id}
+      - name: customer_id
+        tests:
+          - relationships: {to: ref('bronze_loyalty_customers'), field: customer_id}
+      - name: payment_type
+        tests:
+          - accepted_values: {values: ["Card", "App", "Cash"]}

@@ -10,7 +10,7 @@
 -- own traffic shape, each behind its own resource monitor so a runaway job
 -- in one workload can't burn credits meant for another:
 --
---   NERO_LOAD_WH  ingestion (bronze landing tasks + manual batch loads)  bursty, short
+--   NERO_LOAD_WH  ingestion (staging landing tasks + manual batch loads)  bursty, short
 --   NERO_DBT_WH   dbt transforms (snapshot/build)                 bursty, short
 --   NERO_BI_WH    Streamlit / Power BI reporting                  interactive,
 --                 variable concurrency -> multi-cluster, longer idle timeout
@@ -73,7 +73,7 @@ CREATE WAREHOUSE IF NOT EXISTS NERO_LOAD_WH
   AUTO_RESUME = TRUE
   INITIALLY_SUSPENDED = TRUE
   RESOURCE_MONITOR = MON_NERO_LOAD
-  COMMENT = 'Ingestion compute: the 3 bronze-landing adapters (Task-triggered and manual). Bursty, short-lived — fast auto-suspend.';
+  COMMENT = 'Ingestion compute: the 3 staging-landing adapters (Task-triggered and manual). Bursty, short-lived — fast auto-suspend.';
 
 CREATE WAREHOUSE IF NOT EXISTS NERO_DBT_WH
   WAREHOUSE_SIZE = 'XSMALL'

@@ -1,38 +1,39 @@
-version: 5
+version: 6
 contract_id: nero_loyalty_contract
 wire_format: nero_snapshot_v2
 
 # Platform-level ingestion config, merged in from the guide's separate
 # deployment.yaml. landing.type=typed lands each dataset in its own typed
-# BRONZE_<DATASET> table (columns/types generated straight from this
-# contract, same as VALIDATED_<DATASET>) plus one BRONZE_BATCH_MANIFESTS
+# STAGING_<DATASET> table (columns/types generated straight from this
+# contract, same as BRONZE_<DATASET>) plus one STAGING_BATCH_MANIFESTS
 # table carrying batch-level metadata -- readable by design, not a shared
 # JSON envelope table. Only source.type=internal_stage is deployed/tested --
 # the s3 block is schema-valid and the generator emits real SQL for it, but
 # it's UNVERIFIED (no live AWS credentials in this account).
 #
 # NERO_DB is split into numbered schemas by pipeline stage (see
-# ingestion/build.py's schema constants) — bronze objects below live in
-# "00_BRONZE". Quoted because Snowflake requires quoting an identifier
-# starting with a digit.
+# ingestion/build.py's schema constants) — staging objects below live in
+# "00_STAGING" (renamed from "00_BRONZE" -- see analytics/README.md for the
+# full Staging/Bronze/Silver rename mapping). Quoted because Snowflake
+# requires quoting an identifier starting with a digit.
 ingestion:
   source:
     type: internal_stage          # internal_stage | s3
     file_pattern: ".*[.]csv"
     on_error: ABORT_STATEMENT
     internal_stage:
-      stage_name: 'NERO_DB."00_BRONZE".LANDING_STAGE'
+      stage_name: 'NERO_DB."00_STAGING".LANDING_STAGE'
     s3:
-      stage_name: 'NERO_DB."00_BRONZE".S3_STAGE'
+      stage_name: 'NERO_DB."00_STAGING".S3_STAGE'
       integration_name: NERO_S3_INTEGRATION
       bucket_url: "s3://REPLACE_BUCKET/nero/"
       aws_role_arn: "arn:aws:iam::123456789012:role/REPLACE_ROLE"
       auto_ingest: true
-      pipe_name: 'NERO_DB."00_BRONZE".CONTRACT_PIPE'
+      pipe_name: 'NERO_DB."00_STAGING".CONTRACT_PIPE'
   landing:
     type: typed                   # typed | iceberg
-    manifest_table_name: 'NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS'
-    dataset_table_prefix: 'NERO_DB."00_BRONZE".BRONZE_'
+    manifest_table_name: 'NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS'
+    dataset_table_prefix: 'NERO_DB."00_STAGING".STAGING_'
     iceberg:
       external_volume: SNOWFLAKE_MANAGED
       base_location: nero/raw/envelopes

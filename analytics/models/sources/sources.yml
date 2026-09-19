@@ -1,28 +1,30 @@
 version: 2
 
 sources:
-  - name: nero_bronze
+  - name: nero_staging
     description: >
-      Typed, unvalidated landing tables (bronze layer) -- generated from
-      ingestion/contract/ (see sources/definitions/ingestion/raw.sql), one
-      table per dataset, written directly by the 3 ingestion adapters
+      Typed, unvalidated landing tables (staging layer -- renamed from
+      "bronze"; see analytics/README.md for the full Staging/Bronze/Silver
+      rename mapping) -- generated from ingestion/contract/ (see
+      sources/definitions/ingestion/raw.sql), one table per dataset,
+      written directly by the 3 ingestion adapters
       (ingestion/load_csv_batch.py, GENERATE_SYNTHETIC_DAY(),
       INGEST_FROM_GOOGLE_SHEETS()). Columns are nullable regardless of the
       contract's own nullable flag -- bad rows stay visible here for
-      debugging, since validation now happens in the silver models
-      (analytics/models/silver/), not before landing.
+      debugging, since validation now happens in the bronze models
+      (analytics/models/bronze/), not before landing.
     database: NERO_DB
-    schema: '"00_BRONZE"'
+    schema: '"00_STAGING"'
 
     tables:
       - name: stores
-        identifier: BRONZE_STORES
+        identifier: STAGING_STORES
 
       - name: loyalty_customers
-        identifier: BRONZE_LOYALTY_CUSTOMERS
+        identifier: STAGING_LOYALTY_CUSTOMERS
 
       - name: transactions
-        identifier: BRONZE_TRANSACTIONS
+        identifier: STAGING_TRANSACTIONS
 
       - name: loyalty_events
-        identifier: BRONZE_LOYALTY_EVENTS
+        identifier: STAGING_LOYALTY_EVENTS

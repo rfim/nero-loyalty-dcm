@@ -16,6 +16,6 @@ select
     tier,
     home_store_id,
     batch_id
-from {{ ref('validated_loyalty_customers') }}
+from {{ ref('silver_loyalty_customers') }}
 
 {% endsnapshot %}

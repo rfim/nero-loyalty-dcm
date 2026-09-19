@@ -9,7 +9,7 @@ so a non-Snowflake person can tell at a glance whether the daily pipeline
 is healthy without knowing what a Task or a dbt model is.
 
 Every number here is read live (SELECT, no caching beyond the 5-minute
-Streamlit cache) -- row counts per layer, BRONZE_BATCH_MANIFESTS as a
+Streamlit cache) -- row counts per layer, STAGING_BATCH_MANIFESTS as a
 landing log (audit trail only, no status), and SNOWFLAKE.ACCOUNT_USAGE.
 TASK_HISTORY for both task states.
 """
@@ -57,26 +57,26 @@ def one(sql: str):
 def load_pipeline_data():
     last_batch = rows("""
         SELECT BATCH_ID, SOURCE_SYSTEM, CAPTURED_AT
-        FROM NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS
+        FROM NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS
         ORDER BY CAPTURED_AT DESC LIMIT 1
     """)
     last_batch = last_batch[0] if last_batch else None
 
-    bronze_count = sum(
-        one(f'SELECT COUNT(*) AS N FROM NERO_DB."00_BRONZE".BRONZE_{ds}')["N"]
+    staging_count = sum(
+        one(f'SELECT COUNT(*) AS N FROM NERO_DB."00_STAGING".STAGING_{ds}')["N"]
         for ds in ("STORES", "TRANSACTIONS", "LOYALTY_EVENTS", "LOYALTY_CUSTOMERS")
     )
     layers = [
-        {"layer": "Raw landing (Bronze)", "object": "BRONZE_<DATASET> (4 tables)",
-         "count": bronze_count},
-        {"layer": "Validated (Silver)", "object": "VALIDATED_STORES",
-         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_SILVER".VALIDATED_STORES')["N"]},
-        {"layer": "Validated (Silver)", "object": "VALIDATED_LOYALTY_CUSTOMERS",
-         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_CUSTOMERS')["N"]},
-        {"layer": "Validated (Silver)", "object": "VALIDATED_TRANSACTIONS",
-         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS')["N"]},
-        {"layer": "Validated (Silver)", "object": "VALIDATED_LOYALTY_EVENTS",
-         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS')["N"]},
+        {"layer": "Raw landing (Staging)", "object": "STAGING_<DATASET> (4 tables)",
+         "count": staging_count},
+        {"layer": "Contract-filtered (Bronze)", "object": "BRONZE_STORES",
+         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_BRONZE".BRONZE_STORES')["N"]},
+        {"layer": "Contract-filtered (Bronze)", "object": "BRONZE_LOYALTY_CUSTOMERS",
+         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_BRONZE".BRONZE_LOYALTY_CUSTOMERS')["N"]},
+        {"layer": "Contract-filtered (Bronze)", "object": "BRONZE_TRANSACTIONS",
+         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_BRONZE".BRONZE_TRANSACTIONS')["N"]},
+        {"layer": "Contract-filtered (Bronze)", "object": "BRONZE_LOYALTY_EVENTS",
+         "count": one('SELECT COUNT(*) AS N FROM NERO_DB."01_BRONZE".BRONZE_LOYALTY_EVENTS')["N"]},
         {"layer": "Transformed (Gold)", "object": "DIM_STORE",
          "count": one('SELECT COUNT(*) AS N FROM NERO_ANALYTICS."02_GOLD".DIM_STORE')["N"]},
         {"layer": "Transformed (Gold)", "object": "DIM_CUSTOMER_SCD",
@@ -89,7 +89,7 @@ def load_pipeline_data():
 
     batch_rows = rows("""
         SELECT BATCH_ID, SOURCE_SYSTEM, DATASETS, CAPTURED_AT
-        FROM NERO_DB."00_BRONZE".BRONZE_BATCH_MANIFESTS
+        FROM NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS
         ORDER BY CAPTURED_AT DESC LIMIT 20
     """)
     recent_batches = [
@@ -187,7 +187,7 @@ def build_pdf(d: dict) -> bytes:
     sections = [
         ("Executive Summary", [
             rc.body(f"Last batch landed: <b>{d['last_batch_id']}</b> at {d['last_batch_captured_at']}."),
-            rc.caption("Sources: NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS, SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY."),
+            rc.caption("Sources: NERO_DB.\"00_STAGING\".STAGING_BATCH_MANIFESTS, SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY."),
         ]),
         ("1. Pipeline Stages", [
             rc.styled_table(["Stage", "Last Status", "What It Does"], stage_rows, col_widths=[110, 130, 220]),

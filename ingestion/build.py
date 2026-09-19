@@ -4,10 +4,12 @@ DCM SQL + reference SQL, and (with --seed) loads the PII column registry
 and the lineage map with data.
 
 NERO_DB is split into numbered schemas by pipeline stage:
-  00_BRONZE       typed, unvalidated landing (BRONZE_<DATASET>,
-                  BRONZE_BATCH_MANIFESTS, LANDING_STAGE)
-  01_SILVER       validated tables (VALIDATED_*) -- now dbt-owned, built by
-                  analytics/models/silver/, not generated here
+  00_STAGING      typed, unvalidated landing (STAGING_<DATASET>,
+                  STAGING_BATCH_MANIFESTS, LANDING_STAGE) -- was 00_BRONZE
+  01_BRONZE       contract-filtered tables (BRONZE_*) -- dbt-owned, built by
+                  analytics/models/bronze/, not generated here. Was
+                  01_SILVER/VALIDATED_* before the Staging/Bronze/Silver
+                  rename (see analytics/README.md for the full mapping).
   02_CONTROL      retired (was: contract registry, audit, release pointer,
                   PROCESS_BATCH/RUN_PENDING -- see engine.sql for why)
   03_LINEAGE      pipeline stage/dependency documentation
@@ -16,9 +18,9 @@ NERO_DB is split into numbered schemas by pipeline stage:
 
 Emits:
   - sources/definitions/ingestion/raw.sql        (DCM-managed, deployed --
-    BRONZE_<DATASET> + BRONZE_BATCH_MANIFESTS)
+    STAGING_<DATASET> + STAGING_BATCH_MANIFESTS)
   - sources/definitions/ingestion/validated.sql  (DCM-managed, deployed --
-    retirement placeholder only; dbt owns VALIDATED_* now)
+    retirement placeholder only; dbt owns BRONZE_* now)
   - sources/definitions/ingestion/lineage.sql     (DCM-managed, deployed —
     schema only; rows loaded by --seed, since DCM manages schema not data)
   - sources/definitions/ingestion/pii_registry.sql (DCM-managed, deployed —
@@ -47,8 +49,8 @@ from contract_loader import load_contract
 
 ROOT = Path(__file__).resolve().parent.parent
 
-BRONZE = 'NERO_DB."00_BRONZE"'
-SILVER = 'NERO_DB."01_SILVER"'
+STAGING = 'NERO_DB."00_STAGING"'
+BRONZE = 'NERO_DB."01_BRONZE"'
 CONTROL = 'NERO_DB."02_CONTROL"'
 LINEAGE = 'NERO_DB."03_LINEAGE"'
 METADATA = 'NERO_DB."04_METADATA"'
@@ -89,7 +91,7 @@ def gen_raw_landing(doc):
     ]
     if source["type"] == "internal_stage":
         lines += [
-            f"DEFINE STAGE {BRONZE}.LANDING_STAGE",
+            f"DEFINE STAGE {STAGING}.LANDING_STAGE",
             "    COMMENT = 'Credential-free internal stage for manual/CI batch uploads (typed per-dataset CSVs, one file per dataset per batch).';",
             "",
         ]
@@ -101,11 +103,12 @@ def gen_raw_landing(doc):
         # One typed table per contract dataset -- readable by design (real
         # columns, not a JSON blob), landed directly by each adapter or via
         # COPY INTO from a per-dataset staged CSV. Columns are nullable
-        # regardless of the contract's own nullable flag: bronze's job is to
-        # preserve whatever arrived, including invalid rows, so PROCESS_BATCH
-        # can give a precise "row N: col is required but null" message
-        # instead of the INSERT itself opaquely failing. NOT_NULL is enforced
-        # downstream, on VALIDATED_<DATASET> (see gen_validated_tables).
+        # regardless of the contract's own nullable flag: staging's job is
+        # to preserve whatever arrived, including invalid rows, so
+        # downstream contract filtering (analytics/models/bronze/) can give
+        # a precise "this row is missing a required column" signal instead
+        # of the INSERT itself opaquely failing. NOT NULL is enforced
+        # downstream, on BRONZE_<DATASET> (dbt-owned, not generated here).
         for ds_name, ds in doc["datasets"].items():
             table = f"{landing['dataset_table_prefix']}{ds_name.upper()}"
             col_lines = []
@@ -121,7 +124,7 @@ def gen_raw_landing(doc):
             lines += col_lines
             lines.append(")")
             contract_version = doc["version"]
-            lines.append(f"COMMENT = 'Typed bronze landing for {ds_name}, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v{contract_version}.';")
+            lines.append(f"COMMENT = 'Typed staging landing for {ds_name}, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v{contract_version}.';")
             lines.append("")
 
         lines += [
@@ -135,7 +138,7 @@ def gen_raw_landing(doc):
             "    INGESTED_AT       TIMESTAMP_TZ  DEFAULT CURRENT_TIMESTAMP(),",
             "    PRIMARY KEY (BATCH_ID)",
             ")",
-            "COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count} in DATASETS. Audit trail only -- dbt reads BRONZE_<DATASET> directly and does not consult this table.';",
+            "COMMENT = 'One row per submitted batch: which contract version it targets, and per-dataset {row_count} in DATASETS. Audit trail only -- dbt reads STAGING_<DATASET> directly and does not consult this table.';",
         ]
     elif landing["type"] == "iceberg":
         iceberg = landing["iceberg"]
@@ -158,20 +161,20 @@ def gen_raw_landing(doc):
 
 
 def gen_validated_tables(doc):
-    """RETIRED: VALIDATED_<DATASET> is no longer DCM-generated/owned. dbt now
-    builds and owns these tables directly -- analytics/models/silver/
-    validated_<dataset>.sql, materialized as table (full datasets) or
-    incremental (transactions), filtered by the same contract rules in
-    plain SQL. Emits an explanatory placeholder rather than any DEFINE
-    statement, so DCM drops its old copies of these tables (dbt recreates
-    them immediately after, now dbt-owned) instead of fighting dbt for
-    ownership. REPORTING_CURRENT_RELEASE is retired with it -- it joined
-    CONTROL_RELEASE_POINTER, which no longer exists."""
+    """RETIRED: BRONZE_<DATASET> (formerly VALIDATED_<DATASET>) is no longer
+    DCM-generated/owned. dbt builds and owns these tables directly --
+    analytics/models/bronze/bronze_<dataset>.sql, materialized as table
+    (full datasets) or incremental (transactions), filtered by the same
+    contract rules in plain SQL. Emits an explanatory placeholder rather
+    than any DEFINE statement, so DCM drops its old copies of these tables
+    (dbt recreates them immediately after, now dbt-owned) instead of
+    fighting dbt for ownership. REPORTING_CURRENT_RELEASE is retired with
+    it -- it joined CONTROL_RELEASE_POINTER, which no longer exists."""
     return "\n".join([
         "-- =============================================================================",
         "-- GENERATED by ingestion/build.py from ingestion/contract/ — do not hand-edit.",
-        "-- VALIDATED_<DATASET> is no longer generated here. dbt owns these tables now:",
-        "-- see analytics/models/silver/validated_<dataset>.sql.",
+        "-- BRONZE_<DATASET> is no longer generated here. dbt owns these tables now:",
+        "-- see analytics/models/bronze/bronze_<dataset>.sql.",
         "-- =============================================================================",
     ]) + "\n"
 
@@ -225,7 +228,7 @@ def gen_pii_registry_schema(doc):
 
 def gen_masking_reference(doc):
     """One reference file: policy definitions (would live in PII_CONTROL) +
-    the column-attach step (targets SILVER tables). Both UNVERIFIED on this
+    the column-attach step (targets BRONZE tables). Both UNVERIFIED on this
     account (masking policies aren't supported by its edition at all —
     confirmed directly, independent of DCM), and DCM doesn't yet support
     attaching a policy to a column even where it is supported."""
@@ -267,10 +270,10 @@ def gen_masking_reference(doc):
             "",
         ]
 
-    lines.append("-- ---- attach to columns in 01_SILVER (manual, after the policies above are deployed) ----")
+    lines.append("-- ---- attach to columns in 01_BRONZE (manual, after the policies above are deployed) ----")
     lines.append("")
     for ds_name, col_name, sql_type, pii_kind in pii_cols:
-        table = f"{SILVER}.VALIDATED_{ds_name.upper()}"
+        table = f"{BRONZE}.BRONZE_{ds_name.upper()}"
         policy = f"{PII_CONTROL}.MASK_{pii_kind.upper()}_{sql_type.upper()}"
         lines.append(f"ALTER TABLE {table} MODIFY COLUMN {col_name.upper()} SET MASKING POLICY {policy};")
 
@@ -313,7 +316,7 @@ def seed_pii_registry(connection, doc):
     than additive, unlike the contract table itself."""
     rows = []
     for ds_name, ds in doc["datasets"].items():
-        table = f"VALIDATED_{ds_name.upper()}"
+        table = f"BRONZE_{ds_name.upper()}"
         for col_name, col in ds["columns"].items():
             if col.get("pii"):
                 pii_kind = col.get("pii_kind", "identifier")
@@ -335,31 +338,32 @@ def seed_pii_registry(connection, doc):
 
 
 def seed_lineage(doc):
-    """Static-ish documentation rows: bronze -> silver -> control chain per
-    dataset, plus the dbt-owned stages downstream. Replace-all, same as the
-    PII registry — this always reflects the current contract + known dbt
-    layer, not an append-only history."""
+    """Static-ish documentation rows: staging -> bronze -> silver chain per
+    dataset (all 3 now dbt-owned except staging's landing tables), plus
+    gold/marts downstream. Replace-all, same as the PII registry — this
+    always reflects the current contract + known dbt layer, not an
+    append-only history."""
     rows = [
-        ("NERO_DB", '00_BRONZE', "BRONZE_BATCH_MANIFESTS", "bronze", None,
-         "One row per submitted batch: contract pin + per-dataset row_count/load_mode/watermark_value."),
+        ("NERO_DB", '00_STAGING', "STAGING_BATCH_MANIFESTS", "staging", None,
+         "One row per submitted batch: contract pin + per-dataset row_count. Audit trail only, no reader."),
     ]
     for ds_name in doc["datasets"]:
         upper = ds_name.upper()
         rows += [
-            ("NERO_DB", '00_BRONZE', f"BRONZE_{upper}", "bronze",
-             "NERO_DB.00_BRONZE.BRONZE_BATCH_MANIFESTS",
+            ("NERO_DB", '00_STAGING', f"STAGING_{upper}", "staging",
+             "NERO_DB.00_STAGING.STAGING_BATCH_MANIFESTS",
              f"Typed, unvalidated landing for {ds_name}. One row per record, real columns, no JSON."),
-            ("NERO_DB", '01_SILVER', f"VALIDATED_{upper}", "silver",
-             f"NERO_DB.00_BRONZE.BRONZE_{upper} -> NERO_DB.02_CONTROL.PROCESS_BATCH",
-             f"Contract-validated {ds_name}, written by PROCESS_BATCH on publish."),
-            ("NERO_ANALYTICS", '00_STAGING', f"STG_{upper}", "dbt_staging",
-             f"NERO_DB.01_SILVER.VALIDATED_{upper}",
-             f"dbt staging view over VALIDATED_{upper}."),
+            ("NERO_DB", '01_BRONZE', f"BRONZE_{upper}", "bronze",
+             f"NERO_DB.00_STAGING.STAGING_{upper}",
+             f"Contract-filtered {ds_name} (dbt model, plain SQL filtering + tests -- see analytics/models/bronze/)."),
+            ("NERO_ANALYTICS", '00_SILVER', f"SILVER_{upper}", "dbt_silver",
+             f"NERO_DB.01_BRONZE.BRONZE_{upper}",
+             f"dbt silver view over BRONZE_{upper} -- light transform (timezone, renames), SCD lives here too (see 01_SNAPSHOTS for customer SCD2)."),
         ]
     rows += [
         ("NERO_ANALYTICS", '02_GOLD', "DIM_* / FACT_*", "dbt_gold",
-         "NERO_ANALYTICS.00_STAGING.STG_*",
-         "Kimball dimensions/facts built from staging (+ 01_SNAPSHOTS for customer SCD2)."),
+         "NERO_ANALYTICS.00_SILVER.SILVER_*",
+         "Kimball dimensions/facts built from silver (+ 01_SNAPSHOTS for customer SCD2)."),
         ("NERO_ANALYTICS", '03_MART_MARKETING', "MART_*", "dbt_mart",
          "NERO_ANALYTICS.02_GOLD.DIM_*/FACT_*",
          "Marketing reporting marts."),

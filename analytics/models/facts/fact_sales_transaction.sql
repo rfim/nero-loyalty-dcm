@@ -1,6 +1,6 @@
 -- Grain: one row per transaction_id (degenerate dimension).
 with txn as (
-    select * from {{ ref('stg_transactions') }}
+    select * from {{ ref('silver_transactions') }}
 ),
 
 matched as (

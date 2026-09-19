@@ -42,7 +42,7 @@ txn_agg as (
         sum(case when f.transaction_date >= dateadd('day', -60, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_60d,
         sum(case when f.transaction_date >= dateadd('day', -90, ao.reporting_as_of_date) then f.net_sales_amount else 0 end) as sales_last_90d,
         sum(case when f.transaction_date >= dateadd('day', -90, ao.reporting_as_of_date) then 1 else 0 end) as visits_last_90d
-    from {{ ref('stg_transactions') }} f
+    from {{ ref('silver_transactions') }} f
     cross join as_of ao
     where f.customer_id is not null
     group by f.customer_id
@@ -54,7 +54,7 @@ event_agg as (
         max(f.event_date) as latest_event_date,
         count_if(f.event_type = 'earn') as earn_count,
         count_if(f.event_type = 'redeem') as redeem_count
-    from {{ ref('stg_loyalty_events') }} f
+    from {{ ref('silver_loyalty_events') }} f
     group by f.customer_id
 ),
 

@@ -4,8 +4,8 @@
 -- TEMPORARY, by design -- there is no real source system feeding this
 -- account yet (no live POS/loyalty feed, no S3 auto-ingest configured).
 -- This generates one new "day" of plausible loyalty/sales activity and
--- lands it into bronze, purely so dashboards/chatbots have something fresh
--- to show daily. Meant to be swapped out for a real feed later --
+-- lands it into staging, purely so dashboards/chatbots have something
+-- fresh to show daily. Meant to be swapped out for a real feed later --
 -- everything here is self-contained in one procedure + two tasks, so
 -- removing it later is just:
 --   ALTER TASK NERO_DB."02_CONTROL".SYNTHETIC_DAILY_INGEST_TASK SUSPEND;
@@ -16,13 +16,13 @@
 -- deliberately kept out of the core contract-managed pipeline since it's
 -- expected to be temporary.
 --
--- Lands into bronze only -- validation/publish into silver is now dbt's
--- job (analytics/models/silver/), triggered by DBT_DAILY_REFRESH_TASK, not
+-- Lands into staging only -- validation/publish into bronze is now dbt's
+-- job (analytics/models/bronze/), triggered by DBT_DAILY_REFRESH_TASK, not
 -- called synchronously from here (see sources/definitions/ingestion/
 -- engine.sql for why PROCESS_BATCH was retired).
 --
 -- transactions lands incrementally (only today's new rows -- dbt's
--- validated_transactions model MERGEs them in by transaction_id) --
+-- bronze_transactions model MERGEs them in by transaction_id) --
 -- transactions are append-only by nature (a POS transaction never mutates
 -- once written), so this is the honest full picture, not a contrived
 -- demo. stores/loyalty_customers/loyalty_events still resubmit their full
@@ -41,7 +41,7 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
 PACKAGES = ('snowflake-snowpark-python')
 HANDLER = 'run'
-COMMENT = 'Generates one new synthetic day of stores/customers/transactions/loyalty_events on top of the current silver snapshot and lands it into bronze. dbt validates and publishes into silver separately (see analytics/models/silver/). transactions lands incrementally (today''s new rows only); everything else stays full. Temporary stand-in for a real data feed -- see account_setup/synthetic_daily_ingest.sql.'
+COMMENT = 'Generates one new synthetic day of stores/customers/transactions/loyalty_events on top of the current bronze snapshot and lands it into staging. dbt validates and publishes into bronze separately (see analytics/models/bronze/). transactions lands incrementally (today''s new rows only); everything else stays full. Temporary stand-in for a real data feed -- see account_setup/synthetic_daily_ingest.sql.'
 AS
 $$
 import json
@@ -51,7 +51,7 @@ from datetime import datetime, timedelta, timezone
 from snowflake.snowpark.functions import col, lit, parse_json, seq8
 
 CONTRACT_ID = "nero_loyalty_contract"
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
 
 
 def _land(session, dataset, rows, columns, batch_id):
@@ -59,7 +59,7 @@ def _land(session, dataset, rows, columns, batch_id):
         return
     tuples = [tuple(list(r[c] for c in columns) + [batch_id, i]) for i, r in enumerate(rows, start=1)]
     df = session.create_dataframe(tuples, schema=[c.upper() for c in columns] + ["BATCH_ID", "FILE_ROW_NUMBER"])
-    df.write.save_as_table(f'NERO_DB."00_BRONZE".BRONZE_{dataset.upper()}', mode="append", column_order="name")
+    df.write.save_as_table(f'NERO_DB."00_STAGING".STAGING_{dataset.upper()}', mode="append", column_order="name")
 
 
 def run(session):
@@ -73,16 +73,16 @@ def run(session):
     batch_id = f"synthetic_{today.strftime('%Y%m%d')}"
 
     already = session.sql(
-        "SELECT 1 FROM NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS WHERE BATCH_ID = ? LIMIT 1",
+        "SELECT 1 FROM NERO_DB.\"00_STAGING\".STAGING_BATCH_MANIFESTS WHERE BATCH_ID = ? LIMIT 1",
         params=[batch_id],
     ).collect()
     if already:
         return {"status": "ALREADY_LANDED_TODAY", "batch_id": batch_id}
 
-    stores = session.sql('SELECT STORE_ID, STORE_NAME, REGION, FORMAT, OPENED_DATE FROM NERO_DB."01_SILVER".VALIDATED_STORES').collect()
-    customers = session.sql('SELECT CUSTOMER_ID, SIGNUP_DATE, TIER, HOME_STORE_ID FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_CUSTOMERS').collect()
-    max_txn_id = session.sql('SELECT MAX(TRANSACTION_ID) AS M FROM NERO_DB."01_SILVER".VALIDATED_TRANSACTIONS').collect()[0]["M"] or 9000000
-    events = session.sql('SELECT EVENT_ID, CUSTOMER_ID, EVENT_TS, EVENT_TYPE, REWARD_ID, STORE_ID FROM NERO_DB."01_SILVER".VALIDATED_LOYALTY_EVENTS').collect()
+    stores = session.sql('SELECT STORE_ID, STORE_NAME, REGION, FORMAT, OPENED_DATE FROM NERO_DB."01_BRONZE".BRONZE_STORES').collect()
+    customers = session.sql('SELECT CUSTOMER_ID, SIGNUP_DATE, TIER, HOME_STORE_ID FROM NERO_DB."01_BRONZE".BRONZE_LOYALTY_CUSTOMERS').collect()
+    max_txn_id = session.sql('SELECT MAX(TRANSACTION_ID) AS M FROM NERO_DB."01_BRONZE".BRONZE_TRANSACTIONS').collect()[0]["M"] or 9000000
+    events = session.sql('SELECT EVENT_ID, CUSTOMER_ID, EVENT_TS, EVENT_TYPE, REWARD_ID, STORE_ID FROM NERO_DB."01_BRONZE".BRONZE_LOYALTY_EVENTS').collect()
 
     store_ids = [r["STORE_ID"] for r in stores]
     customer_ids = [r["CUSTOMER_ID"] for r in customers]
@@ -168,7 +168,7 @@ def run(session):
     # BRONZE_<DATASET> directly and validates/publishes into silver itself;
     # nothing consults this manifest to decide what to do.
     session.sql(
-        "INSERT INTO NERO_DB.\"00_BRONZE\".BRONZE_BATCH_MANIFESTS "
+        "INSERT INTO NERO_DB.\"00_STAGING\".STAGING_BATCH_MANIFESTS "
         "(BATCH_ID, CONTRACT_ID, CONTRACT_VERSION, SOURCE_SYSTEM, CAPTURED_AT, DATASETS) "
         "SELECT ?, ?, ?, ?, ?, PARSE_JSON(?)",
         params=[batch_id, CONTRACT_ID, CONTRACT_VERSION, "synthetic_daily_generator",
