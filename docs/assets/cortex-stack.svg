@@ -1,0 +1,107 @@
+<svg viewBox="0 0 1080 340" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <style>
+      .card { fill: #fdf6e8; stroke: #1c130d; stroke-opacity: .12; stroke-width: 1.5; }
+      .card-agent { fill: #1c130d; }
+      .icon-stroke { fill: none; stroke: #1c130d; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-amber { fill: none; stroke: #b8691f; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-cream { fill: none; stroke: #fdf6e8; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-fill-amber { fill: #e8a659; }
+      .src-title { fill: #1c130d; font-size: 17px; font-weight: 700; }
+      .src-sub { fill: #7a6a58; font-size: 11.5px; }
+      .agent-title { fill: #fdf6e8; font-size: 20px; font-weight: 700; }
+      .agent-sub { fill: #c9b8a2; font-size: 11.5px; }
+      .arrow { stroke: #b8691f; stroke-width: 3; fill: none; stroke-linecap: round; }
+      .arrowhead { fill: #b8691f; }
+    </style>
+  </defs>
+
+  <rect width="1080" height="340" fill="#fffaf0"/>
+
+  <!-- ============ TOOLS (left column) ============ -->
+  <g transform="translate(20,10)">
+    <rect class="card" width="270" height="82" rx="14"/>
+    <g transform="translate(40,41)">
+      <rect class="icon-stroke" x="-16" y="-16" width="32" height="32" rx="3"/>
+      <line class="icon-stroke" x1="-16" y1="-5.3" x2="16" y2="-5.3"/>
+      <line class="icon-stroke" x1="-16" y1="5.3" x2="16" y2="5.3"/>
+      <line class="icon-amber" x1="-5.3" y1="-16" x2="-5.3" y2="16"/>
+      <line class="icon-amber" x1="5.3" y1="-16" x2="5.3" y2="16"/>
+    </g>
+    <text class="src-title" x="72" y="35">Loyalty Semantic View</text>
+    <text class="src-sub" x="72" y="53">stores · customers · transactions · events</text>
+  </g>
+
+  <g transform="translate(20,108)">
+    <rect class="card" width="270" height="82" rx="14"/>
+    <g transform="translate(40,41)">
+      <rect class="icon-stroke" x="-16" y="-16" width="32" height="32" rx="3"/>
+      <line class="icon-stroke" x1="-16" y1="-5.3" x2="16" y2="-5.3"/>
+      <line class="icon-stroke" x1="-16" y1="5.3" x2="16" y2="5.3"/>
+      <line class="icon-amber" x1="-5.3" y1="-16" x2="-5.3" y2="16"/>
+      <line class="icon-amber" x1="5.3" y1="-16" x2="5.3" y2="16"/>
+    </g>
+    <text class="src-title" x="72" y="35">Governance Semantic View</text>
+    <text class="src-sub" x="72" y="53">warehouse credits · budget</text>
+  </g>
+
+  <g transform="translate(20,206)">
+    <rect class="card" width="270" height="82" rx="14"/>
+    <g transform="translate(40,41)">
+      <circle class="icon-stroke" cx="-4" cy="-4" r="13"/>
+      <line class="icon-stroke" x1="6" y1="6" x2="17" y2="17"/>
+    </g>
+    <text class="src-title" x="72" y="35">Findings Search Service</text>
+    <text class="src-sub" x="72" y="53">Trust Center · security findings</text>
+  </g>
+
+  <!-- converging lines -->
+  <path class="arrow" d="M290,51 C 400,51 400,170 500,170"/>
+  <path class="arrow" d="M290,149 C 400,149 400,170 500,170"/>
+  <path class="arrow" d="M290,247 C 400,247 400,170 500,170"/>
+  <g transform="translate(500,170)"><path class="arrowhead" d="M0,-7 L 14,0 L 0,7 Z"/></g>
+
+  <!-- ============ AGENT (center) ============ -->
+  <g transform="translate(520,95)">
+    <rect class="card-agent" width="220" height="150" rx="18"/>
+    <g transform="translate(110,58)">
+      <path class="icon-cream" d="M-30,-18 L 30,-18 C 38,-18 38,10 30,10 L -6,10 L -20,22 L -18,10 L -30,10 C -38,10 -38,-18 -30,-18 Z"/>
+      <circle class="icon-fill-amber" cx="-10" cy="-4" r="3.5"/>
+      <circle class="icon-fill-amber" cx="4" cy="-4" r="3.5"/>
+      <circle class="icon-fill-amber" cx="18" cy="-4" r="3.5"/>
+    </g>
+    <text class="agent-title" x="110" y="115" text-anchor="middle">Agent</text>
+    <text class="agent-sub" x="110" y="133" text-anchor="middle">orchestrates the tools above</text>
+  </g>
+
+  <!-- diverging lines -->
+  <path class="arrow" d="M740,140 C 840,140 840,60 940,60"/>
+  <path class="arrow" d="M740,200 C 840,200 840,280 940,280"/>
+  <g transform="translate(940,60)"><path class="arrowhead" d="M0,-7 L 14,0 L 0,7 Z"/></g>
+  <g transform="translate(940,280)"><path class="arrowhead" d="M0,-7 L 14,0 L 0,7 Z"/></g>
+
+  <!-- ============ CONSUMERS (right column) ============ -->
+  <g transform="translate(790,10)">
+    <rect class="card" width="270" height="100" rx="14"/>
+    <g transform="translate(40,50)">
+      <path class="icon-stroke" d="M-16,-12 L 16,-12 C 20,-12 20,10 16,10 L -4,10 L -14,18 L -12,10 L -16,10 C -20,10 -20,-12 -16,-12 Z"/>
+    </g>
+    <text class="src-title" x="72" y="42">12 Streamlit chatbots</text>
+    <text class="src-sub" x="72" y="60">Nero Assistant + 10 leader personas</text>
+    <text class="src-sub" x="72" y="76">inline lite-run, own tool subset per role</text>
+  </g>
+
+  <g transform="translate(790,230)">
+    <rect class="card" width="270" height="100" rx="14"/>
+    <g transform="translate(40,50)">
+      <rect class="icon-stroke" x="-8" y="-16" width="16" height="10" rx="2"/>
+      <line class="icon-stroke" x1="0" y1="-6" x2="0" y2="4"/>
+      <line class="icon-stroke" x1="-10" y1="4" x2="10" y2="4"/>
+      <line class="icon-stroke" x1="-10" y1="4" x2="-10" y2="14"/>
+      <line class="icon-stroke" x1="10" y1="4" x2="10" y2="14"/>
+    </g>
+    <text class="src-title" x="72" y="42">External MCP clients</text>
+    <text class="src-sub" x="72" y="60">Cortex Code CLI · Copilot Studio</text>
+    <text class="src-sub" x="72" y="76">named AGENT + MCP SERVER objects</text>
+  </g>
+</svg>

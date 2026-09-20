@@ -109,4 +109,6 @@ Refer to `analytics/README.md` and `sources/definitions/README.md` for a
 complete account of the ownership boundaries among DCM, dbt, and plain SQL.
 `ingestion/README.md` covers how the ingestion engine works, what it
 enforces, and how to open a pull request for a new or changed source;
-`analytics/CONTRIBUTING.md` covers the same for the transformation layer.
+`analytics/CONTRIBUTING.md` covers the same for the transformation layer;
+`streamlit_apps/chatbots/README.md` covers the Cortex Analyst and Cortex
+Agent stack, including the exact SQL that built it.
