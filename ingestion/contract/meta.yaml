@@ -56,11 +56,6 @@ ingestion:
       status: temporary
       datasets: [stores, loyalty_customers, transactions, loyalty_events]
       schedule: "06:00 UTC daily"
-      # No location config -- this is a random-data generator, not a feed
-      # with an address. Declared here so the contract still names every
-      # mechanism that can write to staging, even one with nothing to
-      # point at; see account_setup/synthetic_daily_ingest.sql for why it
-      # is temporary and not DCM-managed.
       synthetic: {}
 
     - name: s3_feed
