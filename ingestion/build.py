@@ -65,7 +65,26 @@ from pathlib import Path
 
 from contract_loader import load_contract
 
-ROOT = Path(__file__).resolve().parent.parent
+try:
+    # Normal case: run as a script (`python ingestion/build.py`), where
+    # __file__ is always defined.
+    _INGESTION_DIR = Path(__file__).resolve().parent
+except NameError:
+    # __file__ does not exist when this file's contents are executed
+    # inside a notebook/interactive cell rather than run as a script.
+    # Fall back to the working directory, which must be ingestion/ itself
+    # (the `from contract_loader import load_contract` line above would
+    # already have failed with ModuleNotFoundError otherwise).
+    _INGESTION_DIR = Path.cwd().resolve()
+    if _INGESTION_DIR.name != "ingestion":
+        sys.exit(
+            "build.py: cannot locate the repo root (__file__ is undefined, e.g. "
+            "running inside a notebook cell, and the working directory is not "
+            "ingestion/). Run this as a script instead: "
+            "`python ingestion/build.py [--seed -c <connection>]`."
+        )
+
+ROOT = _INGESTION_DIR.parent
 
 STAGING = 'NERO_DB."00_STAGING"'
 BRONZE = 'NERO_DB."01_BRONZE"'
