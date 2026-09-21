@@ -1,6 +1,7 @@
 -- See bronze_stores.sql for the QUALIFY/append-only-staging rationale.
 -- `not (event_type = 'redeem' and reward_id is null)` replaces
 -- PROCESS_BATCH's required_if policy check -- same rule, plain SQL.
+{{ config(cluster_by=['event_ts']) }}
 select
     e.event_id,
     e.customer_id,

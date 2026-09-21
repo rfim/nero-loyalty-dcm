@@ -150,3 +150,43 @@ no null dimension surrogate keys, unknown-member rate below an agreed threshold.
 | Customer history | snapshot | `strategy: check` |
 | Dimensions / facts | table | move to incremental `merge` only after reconciliation passes |
 | Marts | table or view | depends on query cost once real data is loaded |
+
+## Clustering
+
+Snowflake has no traditional secondary indexes (outside Hybrid Tables,
+not used here). The only lever is a clustering key, and it only helps by
+letting Snowflake skip micro-partitions that cannot contain matching
+rows -- meaningless on a table small enough to fit in one or two
+partitions (~16MB each), which is every table in this platform today
+(the largest, `STAGING_TRANSACTIONS`, is 2.93MB). A clustering key also
+is not free: Snowflake runs background serverless reclustering to
+maintain it, a standing cost.
+
+Despite that, clustering keys are declared in code now rather than left
+as a manual step for whenever volume arrives, because Snowflake's
+automatic reclustering only does work proportional to how unclustered a
+table actually is. Declaring the key today costs approximately nothing
+(nothing to recluster yet) and scales in on its own as row counts grow,
+no one has to notice a threshold and remember to run an `ALTER TABLE`
+later.
+
+| Layer | Table | Clustering key | Declared in |
+|---|---|---|---|
+| Staging | `STAGING_TRANSACTIONS`, `STAGING_LOYALTY_EVENTS` | `INGESTED_AT` | `ingestion/build.py`'s `CLUSTERED_DATASETS` (DCM `DEFINE TABLE ... CLUSTER BY`) |
+| Bronze | `BRONZE_TRANSACTIONS` | `transaction_ts` | `{{ config(cluster_by=...) }}` in the model |
+| Bronze | `BRONZE_LOYALTY_EVENTS` | `event_ts` | `{{ config(cluster_by=...) }}` in the model |
+| Silver | n/a | n/a | `materialized: view` -- no physical table exists to cluster |
+| Gold | `FACT_SALES_TRANSACTION` | `transaction_date_key` | `{{ config(cluster_by=...) }}` in the model |
+| Gold | `FACT_LOYALTY_EVENT` | `event_date_key` | `{{ config(cluster_by=...) }}` in the model |
+
+Only the unbounded, append-only event-stream tables get a key.
+`stores`/`loyalty_customers` and every dimension are small, slowly-changing
+reference data by nature and will never benefit from one, adding a key
+there would be pure reclustering cost with no possible pruning gain.
+
+One operational note: `BRONZE_TRANSACTIONS` is `materialized='incremental'`,
+and dbt only applies a new or changed `cluster_by` at table *creation*
+time, an incremental run against an already-existing table does not pick
+it up. Changing that model's clustering key needs
+`dbt run --full-refresh -s bronze_transactions` to actually take effect,
+not just a normal `dbt build`.

@@ -93,6 +93,11 @@ LINEAGE = 'NERO_DB."03_LINEAGE"'
 METADATA = 'NERO_DB."04_METADATA"'
 PII_CONTROL = 'NERO_DB."05_PII_CONTROL"'
 
+# Datasets that are unbounded, append-only event streams -- the only ones
+# where a staging clustering key can ever matter. stores/loyalty_customers
+# are small, slowly-changing reference data by nature, not included.
+CLUSTERED_DATASETS = {"transactions", "loyalty_events"}
+
 
 def find_source(doc, source_type):
     """First ingestion.sources[] entry of the given type, or None."""
@@ -168,6 +173,18 @@ def gen_raw_landing(doc):
             lines.append(f"DEFINE TABLE {table} (")
             lines += col_lines
             lines.append(")")
+            # Clustering key declared now, not deferred to a manual step
+            # once volume arrives -- Snowflake's automatic reclustering
+            # only does work proportional to how unclustered a table
+            # actually is, so this costs ~nothing at current row counts
+            # and scales in on its own as they grow. Only the two
+            # unbounded, append-only event-stream datasets get one;
+            # stores/loyalty_customers are small, slowly-changing
+            # reference data that will never benefit from clustering. See
+            # analytics/README.md's "Clustering" section for the full
+            # per-layer rationale.
+            if ds_name in CLUSTERED_DATASETS:
+                lines.append("CLUSTER BY (INGESTED_AT)")
             contract_version = doc["version"]
             lines.append(f"COMMENT = 'Typed staging landing for {ds_name}, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v{contract_version}.';")
             lines.append("")

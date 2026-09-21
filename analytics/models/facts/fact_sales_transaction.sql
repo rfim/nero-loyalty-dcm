@@ -1,4 +1,5 @@
 -- Grain: one row per transaction_id (degenerate dimension).
+{{ config(cluster_by=['transaction_date_key']) }}
 with txn as (
     select * from {{ ref('silver_transactions') }}
 ),

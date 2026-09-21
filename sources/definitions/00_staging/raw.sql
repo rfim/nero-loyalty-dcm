@@ -28,6 +28,7 @@ DEFINE TABLE NERO_DB."00_STAGING".STAGING_LOYALTY_EVENTS (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
+CLUSTER BY (INGESTED_AT)
 COMMENT = 'Typed staging landing for loyalty_events, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v7.';
 
 DEFINE TABLE NERO_DB."00_STAGING".STAGING_STORES (
@@ -54,6 +55,7 @@ DEFINE TABLE NERO_DB."00_STAGING".STAGING_TRANSACTIONS (
     FILE_ROW_NUMBER      NUMBER       NOT NULL,
     INGESTED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
+CLUSTER BY (INGESTED_AT)
 COMMENT = 'Typed staging landing for transactions, one row per record, unvalidated. Batches identified by BATCH_ID; FILE_ROW_NUMBER is per-batch position. Generated from contract v7.';
 
 DEFINE TABLE NERO_DB."00_STAGING".STAGING_BATCH_MANIFESTS (
