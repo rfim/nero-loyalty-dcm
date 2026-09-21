@@ -5,7 +5,7 @@
 -- transaction_id. This is dbt's native replacement for the hand-built
 -- MERGE branch PROCESS_BATCH used to run for this dataset's
 -- load_mode="incremental".
-{{ config(materialized='incremental', unique_key='transaction_id') }}
+{{ config(materialized='incremental', unique_key='transaction_id', cluster_by=['transaction_ts']) }}
 
 select
     t.transaction_id,

@@ -1,5 +1,6 @@
 -- Grain: one row per event_id (degenerate dimension: event_type is carried
 -- as a plain column, not modeled as its own dimension — only 4 values).
+{{ config(cluster_by=['event_date_key']) }}
 with evt as (
     select * from {{ ref('silver_loyalty_events') }}
 ),
