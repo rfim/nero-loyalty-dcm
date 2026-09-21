@@ -13,6 +13,20 @@ rather than the gold/SCD layer — tier is read as each customer's *current*
 tier, not reconstructed at each historical transaction, because the
 source has no tier-change history to do that precisely.
 
+Two metric definitions were confirmed by email with the stakeholder
+(Matt Greenwell, Caffe Nero, 2026-09-18) rather than assumed:
+- Store/region signups are attributed to the store recorded on the
+  signup event itself, not the customer's home store -- "sign ups by
+  store then yes [event store]... [customer] home store then no." The
+  two differ whenever a signup happens away from the store someone ends
+  up transacting at most.
+- Redemption rate is "Number redeemed / Number issued" -- confirmed as a
+  rate, not a raw count, with "issued" mapped to `earn` events, the only
+  proxy this dataset has for a reward being made available to redeem.
+Customer tier (current, not historical) and loyalty visits
+(customer_id present = identified) were also confirmed, unchanged from
+the original assumption.
+
 The visual design (palette, type, chart drawing, hover tooltips) is kept
 byte-for-byte identical to the Claude Artifact version of this dashboard —
 only the data source changed, from a static JSON snapshot to a live query
@@ -93,8 +107,16 @@ def load_dashboard_data():
           FROM ev GROUP BY STORE_ID
         ),
         signups AS (
-          SELECT HOME_STORE_ID AS STORE_ID, COUNT(*) AS signups
-          FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS GROUP BY HOME_STORE_ID
+          -- Attributed to the store recorded on the signup event itself,
+          -- not the customer's home store -- confirmed by email 2026-09-18
+          -- (Matt Greenwell, Caffe Nero): "sign ups by store then yes [use
+          -- the signup event's store]... [customer] home store then no."
+          -- The two differ whenever someone signs up away from the store
+          -- they end up transacting at most often.
+          SELECT STORE_ID, COUNT(*) AS signups
+          FROM {BRONZE}.BRONZE_LOYALTY_EVENTS
+          WHERE EVENT_TYPE = 'signup'
+          GROUP BY STORE_ID
         )
         SELECT s.STORE_ID AS STORE_ID, s.STORE_NAME AS NAME, s.REGION AS REGION, s.FORMAT AS FORMAT,
           COALESCE(g.signups, 0) AS SIGNUPS,
@@ -113,9 +135,12 @@ def load_dashboard_data():
 
     region_rows = rows(f"""
         WITH signups AS (
+          -- Same store-attribution fix as store_rows above: signup
+          -- event's own store, not customer home store.
           SELECT s.REGION, COUNT(*) AS signups
-          FROM {BRONZE}.BRONZE_LOYALTY_CUSTOMERS c
-          JOIN {BRONZE}.BRONZE_STORES s ON s.STORE_ID = c.HOME_STORE_ID
+          FROM {BRONZE}.BRONZE_LOYALTY_EVENTS e
+          JOIN {BRONZE}.BRONZE_STORES s ON s.STORE_ID = e.STORE_ID
+          WHERE e.EVENT_TYPE = 'signup'
           GROUP BY s.REGION
         ),
         rr AS (
