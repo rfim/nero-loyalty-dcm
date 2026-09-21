@@ -60,13 +60,26 @@ specifically.
   schema, not a lint warning.
 
 **Not enforced**, stated plainly: merging to `main` does not
-automatically redeploy the native `DBT PROJECT` object Snowsight reads
-for its DAG view. That redeploy is a separate, manual `snow dbt deploy`
-(see `analytics/README.md`'s "dbt Projects on Snowflake" section), and it
-was found stale by roughly two days during this project's own history,
-silently, until someone thought to check it. Whoever merges a
-transformation PR that should be visible in Snowsight is responsible for
-that redeploy; nothing currently does it for them.
+automatically redeploy the native `DBT PROJECT` object. That redeploy is
+a separate, manual `snow dbt deploy` (see `analytics/README.md`'s "dbt
+Projects on Snowflake" section). This is not just a Snowsight display
+issue, `SYNTHETIC_DAILY_INGEST_TASK`'s DAG
+(`account_setup/daily_pipeline_orchestration.sql`) calls
+`EXECUTE DBT PROJECT NERO_ANALYTICS.DBT_PROJECT.NERO_ANALYTICS`, the
+native project object, not the CLI. Every scheduled production run
+executes whatever was last deployed there, which can silently lag behind
+`main` by however long it's been since the last `snow dbt deploy`.
+
+Confirmed the hard way: a `cluster_by` config change (PR #78) was
+verified locally with `dbt build` and merged, but the native project was
+never redeployed. The next scheduled DAG run rebuilt every plain
+`materialized: table` model (anything not `incremental`, which only gets
+merged into, not recreated) using the stale pre-change code, silently
+dropping the new clustering keys the moment those tables were rebuilt.
+Local `dbt build` passing is not evidence a merged change is actually
+live in production; only a `snow dbt deploy` followed by a run through
+that same native project confirms it. Whoever merges a transformation PR
+is responsible for that redeploy; nothing currently does it for them.
 
 ## Opening a PR
 
@@ -93,16 +106,18 @@ that redeploy; nothing currently does it for them.
    schema can hide.
 6. **State what changed and what needs a follow-up.** In the PR
    description, name the layer changed, the test coverage added, and
-   whether the native `DBT PROJECT` object needs a manual redeploy after
-   merge for the change to be visible in Snowsight.
+   confirm the native `DBT PROJECT` object was redeployed (see "After
+   merge"), not just that it will be at some point.
 
 ## After merge
 
-- Run `dbt build --target prod`, or confirm the scheduled task does:
-  `DBT_DAILY_REFRESH_TASK` runs it daily, but a change merged between
-  schedule runs is not live until the next one.
-- Redeploy the native `DBT PROJECT` object if the change should be
-  visible in Snowsight's DAG view:
+Redeploy the native `DBT PROJECT` object. This is required, not
+optional cleanup, `DBT_DAILY_REFRESH_TASK` (the scheduled task every
+production run goes through) executes whatever is deployed there, not
+whatever is on `main`. Until this runs, the scheduled task keeps
+rebuilding `table`-materialized models from the pre-merge code on its
+normal schedule, which can silently revert a merged change the next
+time it fires:
 
   ```bash
   snow dbt deploy nero_analytics --source . --profiles-dir . \
