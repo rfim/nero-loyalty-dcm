@@ -78,7 +78,7 @@ downstream addition.
 
 - **Platform Governance.** A single Streamlit dashboard comprising six tabs: pipeline health, security and governance, data quality, platform cost, chatbot cost, and chatbot security.
 - **Loyalty Engagement and Sales.** A dashboard intended for store operations and marketing stakeholders, organized around three questions: which stores or regions lead or lag in engagement, how loyalty activity relates to spend, and which additional observations merit attention.
-- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role.
+- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role. Every answer opens with a Minimum Viable Truth headline; users choose between a short data story (setup, turn, and so what) and the headline alone, and whether to include a chart, trading answer depth for cost and speed.
 - **Power BI.** A dedicated read-only service identity, scoped exclusively to the three marts listed above.
 
 ## Repository structure

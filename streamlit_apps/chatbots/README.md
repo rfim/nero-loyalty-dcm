@@ -219,6 +219,119 @@ this code, it's each persona's own least-privilege Snowflake role
 which of an already-granted role's tools to wire into the request, it
 cannot grant a persona access to something its role does not have.
 
+## How answers are shaped
+
+Every answer opens with a **Minimum Viable Truth** (MVT): the single
+fact that answers the question. By default the answer then tells a
+short data story. Both formats, and the chart tool, live in one module,
+`shared/answer_style.py`, which all 12 apps use; the apps only keep
+their own role instruction and tool list.
+
+### Answer style: a cost / depth trade-off
+
+Users pick how much the agent writes in the sidebar, per conversation:
+
+| Option | What the user gets | When to use it |
+|---|---|---|
+| **Story** (default) | MVT headline, then setup, turn and so what | Decisions, anything needing context |
+| **MVT** | The headline only, plus one sentence for a caveat | Quick lookups, high-volume use |
+| **Include a chart** (switch) | Adds the `data_to_chart` step | Comparisons and trends |
+
+Measured on the same 24 questions (2 per app, each run under its own
+role) against the live agent, median per answer:
+
+| Setting | Words | Time | Charts (of 24) |
+|---|---|---|---|
+| Story + chart | 142 | 26.4 s | 17 |
+| Story, no chart | 137 | 24.1 s | 13 |
+| MVT + chart | 34 | 21.1 s | 16 |
+| MVT, no chart | 39 | 18.6 s | 10 |
+
+MVT writes about 75% less and answers about 20-30% faster. Output
+length and agent steps are what drive Cortex Agent token use, so MVT is
+the cheaper setting; check `SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY`
+for the credits a given period actually used. The agent sometimes charts
+on its own even without `data_to_chart` (hence 10 charts with the switch
+off), so the apps also hide `response.chart` events when the switch is
+off: off means no charts shown, and a few seconds saved rather than zero
+chart cost.
+
+<img src="../../docs/assets/chatbot-ops-mvt-mode.png" width="100%" alt="Nero Store Operations Assistant with the sidebar set to 'MVT — one-line answer' and 'Include a chart' switched off, answering 'Which are the top stores by sales?' with a single Minimum Viable Truth line and a table, no chart" />
+
+### The story format
+
+`STORY_INSTRUCTION` in `shared/answer_style.py`:
+
+```
+**Minimum Viable Truth: <the single fact that answers the question, with its number>**
+
+**The setup** -- the baseline, period or scope the numbers cover.
+**The turn** -- what stands out: the biggest gap, change, outlier or risk, with a comparison.
+**So what** -- why it matters to this persona, and one next step or decision for a human.
+```
+
+The instructions also cap an answer at roughly 180 words, tell the
+agent to say the numbers are steady rather than invent a turn, and to
+call out incomplete periods such as the current month.
+
+- **Charts.** With the chart switch on, any app with a Cortex Analyst
+  tool also gets the `data_to_chart` tool (`CHART_TOOL_SPEC` in
+  `shared/answer_style.py`), and the orchestration instructions ask for
+  one simple chart of the key finding: bar for comparisons, line for
+  trends. It needs no `tool_resources` entry. Search-only personas
+  (Audit, Security Lead) don't show the switch, since findings text has
+  nothing to plot. Charts arrive as `response.chart` events carrying a
+  Vega-Lite spec and are drawn with `st.vega_lite_chart`.
+- **Tables and charts survive reruns.** Each app calls `st.rerun()`
+  after an answer, which redraws history from `st.session_state`. Tables
+  and charts are stored on the message as `attachments` and redrawn from
+  there; without that, they vanish as soon as the answer finishes.
+  Conversations reopened from the sidebar come back from
+  `chat_store`, which keeps text only, so they show no tables or charts.
+- **Planning narration is dropped.** The agent sometimes streams a line
+  like "I'll look at the loyalty data..." as a separate text block
+  before calling a tool. Text blocks are separated by `content_index`,
+  and `answer_style.from_headline()` starts the displayed and saved
+  answer at the `**Minimum Viable Truth` headline, in either style.
+
+To change either format, edit `shared/answer_style.py`; every chatbot
+picks it up on the next deploy. It is listed in each app's `artifacts`
+in `snowflake.yml`, so a new app must list it too.
+
+### What an answer looks like
+
+The apps run inside Snowflake under each persona's own role, so most
+readers of this repo can't open them. These are real answers from the
+live agent and data, captured from this repo's app code running under
+each persona's own Snowflake role, in the default Story style with the
+chart on (sidebar and chat input hidden).
+
+**Store Operations: a ranking, with a table and a bar chart.** The turn
+is the 2.4x gap between the best and worst store; the so-what is that
+raw sales mostly track footfall, so compare basket size before making
+staffing decisions.
+
+<img src="../../docs/assets/chatbot-ops-top-stores.png" width="100%" alt="Nero Store Operations Assistant answering 'Which are the top stores by sales?' with a Minimum Viable Truth headline, setup, turn and so-what, a store table and a horizontal bar chart of sales by store" />
+
+**Finance: a partial period, called out.** The headline number is
+correct but incomplete. The story says the transaction data only covers
+Sept 18-28 and warns against using it as a month-end figure, with a
+daily line chart as evidence.
+
+<img src="../../docs/assets/chatbot-finance-revenue.png" width="100%" alt="Nero Finance Assistant answering 'What is total revenue this month?': £8,642.47 so far, flagged as covering only Sept 18-28, with a daily revenue line chart" />
+
+**CEO: a "steady" story.** Nothing is over budget, so the answer says so
+instead of inventing drama, and points to the one workload worth
+watching.
+
+<img src="../../docs/assets/chatbot-ceo-budget.png" width="100%" alt="Nero CEO Assistant answering 'How are credits used versus budget by workload this month?': every workload under budget, Reporting/BI highest at 65%, with a grouped bar chart and table" />
+
+**Security Lead: a text-only story.** Search answers have nothing to
+plot, so there is no chart. The story names the risk themes and the
+decision a human has to make.
+
+<img src="../../docs/assets/chatbot-security-findings.png" width="100%" alt="Nero Security Assistant answering 'What critical findings are open right now?' with a story about password-only authentication and network-policy gaps, no chart" />
+
 ## Extending this
 
 - **A new structured-data tool**: add a `TABLES`/`RELATIONSHIPS`/`FACTS`/`DIMENSIONS`/`METRICS`
