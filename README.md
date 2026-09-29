@@ -21,7 +21,7 @@ Four CSV extracts (`stores`, `loyalty_customers`, `transactions`,
 `loyalty_events`) are ingested into Snowflake, validated against a versioned
 data contract, and transformed through a five-stage medallion pipeline. The
 resulting outputs comprise a Kimball star schema, three business marts, a
-governance and security layer, five dashboards, and eleven Cortex-powered
+governance and security layer, five dashboards, and twelve Cortex-powered
 chatbots. Every component described in this document is implemented,
 tested, and deployed against the live account.
 
@@ -78,8 +78,42 @@ downstream addition.
 
 - **Platform Governance.** A single Streamlit dashboard comprising six tabs: pipeline health, security and governance, data quality, platform cost, chatbot cost, and chatbot security.
 - **Loyalty Engagement and Sales.** A dashboard intended for store operations and marketing stakeholders, organized around three questions: which stores or regions lead or lag in engagement, how loyalty activity relates to spend, and which additional observations merit attention.
-- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role. Every answer opens with a Minimum Viable Truth headline; users choose between a short data story (setup, turn, and so what) and the headline alone, and whether to include a chart, trading answer depth for cost and speed.
+- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role. See [Chatbots](#chatbots) below.
 - **Power BI.** A dedicated read-only service identity, scoped exclusively to the three marts listed above.
+
+## Chatbots
+
+Twelve Streamlit chatbots, the Nero Assistant, the Nero Governance
+Assistant, and ten leader personas (CEO, CX, CDO, Finance, Marketing,
+Operations, Audit, Regional, Security Lead, and Platform Lead), answer
+natural-language questions through a Cortex Agent. Each runs under its
+own least-privilege role, so a persona can reach only the data its role
+has been granted.
+
+Every answer opens with a **Minimum Viable Truth**: the single fact that
+answers the question, with its number. Users then choose, per
+conversation, how much more the agent writes, trading answer depth
+against cost and speed:
+
+| Answer style | Content | Median over 24 test questions |
+|---|---|---|
+| **Story** (default) | Headline, then *the setup*, *the turn*, and *so what* for that persona | 142 words, 26.4 s |
+| **MVT** | Headline only | 34 words, 21.1 s |
+| **Include a chart** (switch) | Adds a bar or line chart of the key finding | Disabling it saves a further 2–3 s |
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/chatbot-finance-revenue.png" alt="Nero Finance Assistant in Story style: revenue so far this month, flagged as covering only Sept 18-28, with a daily revenue line chart" /></td>
+<td width="50%"><img src="docs/assets/chatbot-ops-mvt-mode.png" alt="Nero Store Operations Assistant in MVT style with the chart switched off: a single Minimum Viable Truth line naming the top stores, and a table" /></td>
+</tr>
+<tr>
+<td><b>Story.</b> The Finance Assistant reports revenue to date, identifies that the data covers only part of the month, and advises against using the figure for month-end targets.</td>
+<td><b>MVT.</b> The Store Operations Assistant, set to MVT with the chart disabled, returns a single headline and the supporting table.</td>
+</tr>
+</table>
+
+Further answer screenshots, the precise story rules, and the measured
+cost trade-off are documented in `streamlit_apps/chatbots/README.md`.
 
 ## Repository structure
 
