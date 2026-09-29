@@ -36,6 +36,7 @@ while not (_p / "shared").is_dir() and _p != _p.parent:
     _p = _p.parent
 _sys.path.insert(0, str(_p / "shared"))
 
+import answer_style
 import branding
 import chat_export
 import chat_store
@@ -60,25 +61,25 @@ TOOL_RESOURCES = {
     },
     "findings_search": {"name": SEARCH_SERVICE, "max_results": 5},
 }
-INSTRUCTIONS = {
-    "response": (
-        "You are the Nero Platform assistant. Answer questions about loyalty/sales "
-        "data using loyalty_analyst, and questions about security/Trust Center "
-        "findings using findings_search. Be concise, cite concrete numbers, and say "
-        "plainly when a question needs a human decision (e.g. changing account "
-        "security settings, enrolling users in MFA, editing network policies) "
-        "rather than just data -- you must never claim to have made such a change "
-        "yourself. Stay within the loyalty, sales and security-governance domain; "
-        "decline unrelated requests. You are read-only: you can query and explain "
-        "data, never modify it."
-    ),
-    "orchestration": (
-        "Use loyalty_analyst for questions about stores, customers, transactions, "
-        "baskets, redemption, or loyalty events. Use findings_search for questions "
-        "about security findings, Trust Center, MFA, network policy, or compliance. "
-        "Use both if a question spans both topics."
-    ),
-}
+# The answer style (MVT or story) and the chart tool are added per request by
+# answer_style.build_request_parts(), from the user's sidebar choice.
+ROLE_INSTRUCTION = (
+    "You are the Nero Platform assistant. Answer questions about loyalty/sales "
+    "data using loyalty_analyst, and questions about security/Trust Center "
+    "findings using findings_search. Be concise, cite concrete numbers, and say "
+    "plainly when a question needs a human decision (e.g. changing account "
+    "security settings, enrolling users in MFA, editing network policies) "
+    "rather than just data -- you must never claim to have made such a change "
+    "yourself. Stay within the loyalty, sales and security-governance domain; "
+    "decline unrelated requests. You are read-only: you can query and explain "
+    "data, never modify it."
+)
+ORCHESTRATION = (
+    "Use loyalty_analyst for questions about stores, customers, transactions, "
+    "baskets, redemption, or loyalty events. Use findings_search for questions "
+    "about security findings, Trust Center, MFA, network policy, or compliance. "
+    "Use both if a question spans both topics."
+)
 
 # ---------------- design ----------------
 st.markdown("""
@@ -143,6 +144,8 @@ if "request_count" not in st.session_state:
 
 # ---------------- sidebar ----------------
 with st.sidebar:
+    style, with_chart = answer_style.sidebar_controls(TOOLS)
+    st.divider()
     st.markdown("### 💬 Conversations")
     if st.button("➕ New chat", use_container_width=True):
         start_new_conversation()
@@ -203,13 +206,18 @@ def render_chart(chart_spec_str: str):
 
 
 def run_agent(history: list[dict], question: str, msg_index: int):
-    req = AgentRunRequest(messages=history, tools=TOOLS, tool_resources=TOOL_RESOURCES, instructions=INSTRUCTIONS)
+    tools, instructions = answer_style.build_request_parts(TOOLS, ROLE_INSTRUCTION, ORCHESTRATION, style, with_chart)
+    req = AgentRunRequest(messages=history, tools=tools, tool_resources=TOOL_RESOURCES, instructions=instructions)
     resp = root.cortex_agent_service.run(req)
 
     text_placeholder = st.empty()
     status_placeholder = st.empty()
     accumulated_text = ""
+    last_text_block = None
     table_idx = 0
+    # Kept with the message so tables/charts survive the st.rerun() after
+    # each answer -- the history loop redraws from these.
+    attachments = []
 
     for event in resp.events():
         if not event.data:
@@ -222,28 +230,46 @@ def run_agent(history: list[dict], question: str, msg_index: int):
         if event.event == "response.status":
             status_placeholder.caption(f"🔄 {payload.get('message', '')}")
         elif event.event == "response.text.delta":
+            if accumulated_text and payload.get("content_index") != last_text_block:
+                accumulated_text += "\n\n"
+            last_text_block = payload.get("content_index")
             accumulated_text += payload.get("text", "")
-            text_placeholder.markdown(accumulated_text)
+            text_placeholder.markdown(answer_style.from_headline(accumulated_text))
         elif event.event == "response.table":
             status_placeholder.empty()
             rs = payload["result_set"]
             cols = [c["name"] for c in rs["resultSetMetaData"]["rowType"]]
             render_table(f"{msg_index}_{table_idx}", cols, rs["data"], question)
+            attachments.append({"kind": "table", "columns": cols, "rows": rs["data"]})
             table_idx += 1
-        elif event.event == "response.chart":
+        elif event.event == "response.chart" and with_chart:
+            # The agent can chart on its own even without data_to_chart;
+            # "chart off" means none are shown either way.
             render_chart(payload["chart_spec"])
+            attachments.append({"kind": "chart", "spec": payload["chart_spec"]})
         elif event.event == "error":
             status_placeholder.empty()
             st.error(payload.get("message", "The assistant hit an error."))
 
     status_placeholder.empty()
-    return accumulated_text
+    return answer_style.from_headline(accumulated_text), attachments
+
+
+def render_attachments(msg_index: int, attachments: list[dict], question: str):
+    for i, a in enumerate(attachments):
+        if a["kind"] == "table":
+            render_table(f"{msg_index}_{i}", a["columns"], a["rows"], question)
+        else:
+            render_chart(a["spec"])
 
 
 # ---------------- chat rendering ----------------
-for msg in st.session_state.messages:
+for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["text"])
+        if msg.get("attachments"):
+            question = st.session_state.messages[i - 1]["text"] if i else ""
+            render_attachments(i, msg["attachments"], question)
 
 if not st.session_state.messages:
     st.write("Try asking:")
@@ -293,8 +319,8 @@ if prompt:
     ]
 
     with st.chat_message("assistant"):
-        answer = run_agent(agent_history, prompt, len(st.session_state.messages))
+        answer, attachments = run_agent(agent_history, prompt, len(st.session_state.messages))
 
-    st.session_state.messages.append({"role": "assistant", "text": answer})
+    st.session_state.messages.append({"role": "assistant", "text": answer, "attachments": attachments})
     chat_store.save_message(session, st.session_state.conversation_id, "assistant", answer)
     st.rerun()
