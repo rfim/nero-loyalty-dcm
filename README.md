@@ -60,27 +60,6 @@ rather than a naming convention.
 | **Gold** | `NERO_ANALYTICS."02_GOLD"` | dbt | Kimball star schema comprising `DIM_*` and `FACT_*` objects, including a complete SCD2 customer-tier snapshot. |
 | **Marts** | `NERO_ANALYTICS."03/04_MART_*"` | dbt | `mart_store_daily_performance`, `mart_customer_loyalty_activity` (PII-safe), and `mart_reward_redemption_daily`, which constitute the data source consumed by Power BI. |
 
-## Governance
-
-The governance layer operates in parallel with the pipeline rather than as a
-downstream addition.
-
-| Schema | Purpose |
-|---|---|
-| `NERO_DB."02_CONTROL"` | Live contract-rejection rate per dataset (`CONTRACT_REJECTIONS`). |
-| `NERO_DB."04_METADATA"` | Freshness metrics (`DATASET_FRESHNESS`), watermarks, and per-model run history, recorded automatically by a dbt `on-run-end` hook. |
-| `NERO_DB."05_PII_CONTROL"` | PII column registry, derived from the contract's own tags. |
-| `NERO_ANALYTICS."05_QUALITY"` | Persisted results of every `dbt build` test, rather than output visible only to the invoking session. |
-| `NERO_GOVERNANCE.SECURITY` / `.COST` | Trust Center findings, login activity, ACCOUNTADMIN role holders, and warehouse or Cortex compute expenditure. |
-| `NERO_GOVERNANCE.REPORTING` | A Power BI-facing view layer wrapping the schemas above. |
-
-## Applications built on the platform
-
-- **Platform Governance.** A single Streamlit dashboard comprising six tabs: pipeline health, security and governance, data quality, platform cost, chatbot cost, and chatbot security.
-- **Loyalty Engagement and Sales.** A dashboard intended for store operations and marketing stakeholders, organized around three questions: which stores or regions lead or lag in engagement, how loyalty activity relates to spend, and which additional observations merit attention.
-- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role. See [Chatbots](#chatbots) below.
-- **Power BI.** A dedicated read-only service identity, scoped exclusively to the three marts listed above.
-
 ## Chatbots
 
 Twelve Streamlit chatbots, the Nero Assistant, the Nero Governance
@@ -114,6 +93,27 @@ against cost and speed:
 
 Further answer screenshots, the precise story rules, and the measured
 cost trade-off are documented in `streamlit_apps/chatbots/README.md`.
+
+## Governance
+
+The governance layer operates in parallel with the pipeline rather than as a
+downstream addition.
+
+| Schema | Purpose |
+|---|---|
+| `NERO_DB."02_CONTROL"` | Live contract-rejection rate per dataset (`CONTRACT_REJECTIONS`). |
+| `NERO_DB."04_METADATA"` | Freshness metrics (`DATASET_FRESHNESS`), watermarks, and per-model run history, recorded automatically by a dbt `on-run-end` hook. |
+| `NERO_DB."05_PII_CONTROL"` | PII column registry, derived from the contract's own tags. |
+| `NERO_ANALYTICS."05_QUALITY"` | Persisted results of every `dbt build` test, rather than output visible only to the invoking session. |
+| `NERO_GOVERNANCE.SECURITY` / `.COST` | Trust Center findings, login activity, ACCOUNTADMIN role holders, and warehouse or Cortex compute expenditure. |
+| `NERO_GOVERNANCE.REPORTING` | A Power BI-facing view layer wrapping the schemas above. |
+
+## Applications built on the platform
+
+- **Platform Governance.** A single Streamlit dashboard comprising six tabs: pipeline health, security and governance, data quality, platform cost, chatbot cost, and chatbot security.
+- **Loyalty Engagement and Sales.** A dashboard intended for store operations and marketing stakeholders, organized around three questions: which stores or regions lead or lag in engagement, how loyalty activity relates to spend, and which additional observations merit attention.
+- **Nero Assistant and ten leader-persona chatbots.** Cortex Agents operating over a loyalty semantic model and a security-findings search service, each executed under its own least-privilege service role. See [Chatbots](#chatbots) above.
+- **Power BI.** A dedicated read-only service identity, scoped exclusively to the three marts listed above.
 
 ## Repository structure
 
