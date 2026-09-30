@@ -25,6 +25,40 @@ governance and security layer, five dashboards, and twelve Cortex-powered
 chatbots. Every component described in this document is implemented,
 tested, and deployed against the live account.
 
+## Chatbots
+
+Twelve Streamlit chatbots, the Nero Assistant, the Nero Governance
+Assistant, and ten leader personas (CEO, CX, CDO, Finance, Marketing,
+Operations, Audit, Regional, Security Lead, and Platform Lead), answer
+natural-language questions through a Cortex Agent. Each runs under its
+own least-privilege role, so a persona can reach only the data its role
+has been granted.
+
+Every answer opens with a **Minimum Viable Truth**: the single fact that
+answers the question, with its number. Users then choose, per
+conversation, how much more the agent writes, trading answer depth
+against cost and speed:
+
+| Answer style | Content | Median over 24 test questions |
+|---|---|---|
+| **Story** (default) | Headline, then *the setup*, *the turn*, and *so what* for that persona | 142 words, 26.4 s |
+| **MVT** | Headline only | 34 words, 21.1 s |
+| **Include a chart** (switch) | Adds a bar or line chart of the key finding | Disabling it saves a further 2–3 s |
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/chatbot-finance-revenue.png" alt="Nero Finance Assistant in Story style: revenue so far this month, flagged as covering only Sept 18-28, with a daily revenue line chart" /></td>
+<td width="50%"><img src="docs/assets/chatbot-ops-mvt-mode.png" alt="Nero Store Operations Assistant in MVT style with the chart switched off: a single Minimum Viable Truth line naming the top stores, and a table" /></td>
+</tr>
+<tr>
+<td><b>Story.</b> The Finance Assistant reports revenue to date, identifies that the data covers only part of the month, and advises against using the figure for month-end targets.</td>
+<td><b>MVT.</b> The Store Operations Assistant, set to MVT with the chart disabled, returns a single headline and the supporting table.</td>
+</tr>
+</table>
+
+Further answer screenshots, the precise story rules, and the measured
+cost trade-off are documented in `streamlit_apps/chatbots/README.md`.
+
 ## Architecture
 
 ```mermaid
@@ -59,40 +93,6 @@ rather than a naming convention.
 | **Silver** | `NERO_ANALYTICS."00_SILVER"` | dbt | Light transformation, implemented as views only, with one `silver_*` object per bronze source. |
 | **Gold** | `NERO_ANALYTICS."02_GOLD"` | dbt | Kimball star schema comprising `DIM_*` and `FACT_*` objects, including a complete SCD2 customer-tier snapshot. |
 | **Marts** | `NERO_ANALYTICS."03/04_MART_*"` | dbt | `mart_store_daily_performance`, `mart_customer_loyalty_activity` (PII-safe), and `mart_reward_redemption_daily`, which constitute the data source consumed by Power BI. |
-
-## Chatbots
-
-Twelve Streamlit chatbots, the Nero Assistant, the Nero Governance
-Assistant, and ten leader personas (CEO, CX, CDO, Finance, Marketing,
-Operations, Audit, Regional, Security Lead, and Platform Lead), answer
-natural-language questions through a Cortex Agent. Each runs under its
-own least-privilege role, so a persona can reach only the data its role
-has been granted.
-
-Every answer opens with a **Minimum Viable Truth**: the single fact that
-answers the question, with its number. Users then choose, per
-conversation, how much more the agent writes, trading answer depth
-against cost and speed:
-
-| Answer style | Content | Median over 24 test questions |
-|---|---|---|
-| **Story** (default) | Headline, then *the setup*, *the turn*, and *so what* for that persona | 142 words, 26.4 s |
-| **MVT** | Headline only | 34 words, 21.1 s |
-| **Include a chart** (switch) | Adds a bar or line chart of the key finding | Disabling it saves a further 2–3 s |
-
-<table>
-<tr>
-<td width="50%"><img src="docs/assets/chatbot-finance-revenue.png" alt="Nero Finance Assistant in Story style: revenue so far this month, flagged as covering only Sept 18-28, with a daily revenue line chart" /></td>
-<td width="50%"><img src="docs/assets/chatbot-ops-mvt-mode.png" alt="Nero Store Operations Assistant in MVT style with the chart switched off: a single Minimum Viable Truth line naming the top stores, and a table" /></td>
-</tr>
-<tr>
-<td><b>Story.</b> The Finance Assistant reports revenue to date, identifies that the data covers only part of the month, and advises against using the figure for month-end targets.</td>
-<td><b>MVT.</b> The Store Operations Assistant, set to MVT with the chart disabled, returns a single headline and the supporting table.</td>
-</tr>
-</table>
-
-Further answer screenshots, the precise story rules, and the measured
-cost trade-off are documented in `streamlit_apps/chatbots/README.md`.
 
 ## Governance
 
