@@ -123,6 +123,7 @@ ingestion/                Data contract (ingestion/contract/) and the generator 
 analytics/                dbt project: bronze, silver, gold, marts, snapshots, tests, and macros
 account_setup/            Idempotent SQL: roles, grants, warehouses, chatbot stacks, and governance views
 streamlit_apps/           Dashboards, chatbots, and leader-persona applications (snowflake.yml is the deployment manifest)
+curriculum/               Six-module course, "Enterprise AI Assistants: From RAG to Snowflake Cortex" (slides as PDF)
 docs/                     Illustration assets referenced by this document
 ```
 
@@ -146,3 +147,5 @@ enforces, and how to open a pull request for a new or changed source;
 `analytics/CONTRIBUTING.md` covers the same for the transformation layer;
 `streamlit_apps/chatbots/README.md` covers the Cortex Analyst and Cortex
 Agent stack, including the exact SQL that built it.
+`curriculum/README.md` indexes the six-module course on building
+enterprise AI assistants, from RAG to Snowflake Cortex.
