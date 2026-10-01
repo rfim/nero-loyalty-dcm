@@ -298,6 +298,35 @@ To change either format, edit `shared/answer_style.py`; every chatbot
 picks it up on the next deploy. It is listed in each app's `artifacts`
 in `snowflake.yml`, so a new app must list it too.
 
+### Guess the Truth: a quiz mode for engagement and awareness
+
+Every chatbot whose role has loyalty or cost data has a **Play** mode in
+the sidebar (10 of 12; Audit and Security Lead only search security
+findings, so they don't). The user commits to a guess first, then the
+agent reveals the real answer from live data as a story with a chart,
+followed by a short **Why it matters** lesson. Committing first is what
+keeps people engaged; having a real number correct their gut feeling is
+what builds awareness.
+
+| Topic | Example question | What the lesson teaches |
+|---|---|---|
+| Business performance | Which loyalty tier has the highest average basket? | Tier gaps are often pennies; value comes from visit frequency |
+| Platform cost | Which workload has used the largest share of its budget? | Watch percentage of budget, not raw spend |
+| Data-quality caveats | On how many days this month does the data have transactions? | A partial month looks like a drop; check the date range first |
+
+- The questions live in `shared/guess_game.py` (11 today). Each names
+  the tool it needs, so a persona only gets questions its role can
+  answer. Adding one is a new `Question(...)` entry.
+- Pick-one questions are scored right or wrong; number questions score a
+  full point when close and half a point when nearly there (tolerances
+  per question). Score and streak are kept per session.
+- The truth is read from the agent's result table (the column matching
+  the question's metric), not from its wording. If no usable table comes
+  back, the round is shown but not scored.
+- Each round is one agent call, saved to chat history under a
+  "🎯 Guess the Truth" conversation and counted toward the session's
+  request limit, so the audit trail and rate limit cover the game too.
+
 ### What an answer looks like
 
 The apps run inside Snowflake under each persona's own role, so most

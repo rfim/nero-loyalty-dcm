@@ -38,6 +38,7 @@ _sys.path.insert(0, str(_p / "shared"))
 
 import answer_style
 import branding
+import guess_game
 import chat_export
 import chat_store
 
@@ -143,8 +144,14 @@ if "request_count" not in st.session_state:
     st.session_state.request_count = 0
 
 # ---------------- sidebar ----------------
+GAME_TOOL_KEYS = ["loyalty", "search"]  # guess_game's names for this app's tools
+
 with st.sidebar:
-    style, with_chart = answer_style.sidebar_controls(TOOLS)
+    playing = guess_game.mode_selector(GAME_TOOL_KEYS)
+    if playing:  # game rounds always reveal as a story with a chart
+        style, with_chart = answer_style.STORY, True
+    else:
+        style, with_chart = answer_style.sidebar_controls(TOOLS)
     st.divider()
     st.markdown("### 💬 Conversations")
     if st.button("➕ New chat", use_container_width=True):
@@ -262,6 +269,17 @@ def render_attachments(msg_index: int, attachments: list[dict], question: str):
         else:
             render_chart(a["spec"])
 
+
+# ---------------- game mode ----------------
+if playing:
+    guess_game.render(
+        GAME_TOOL_KEYS,
+        guess_game.audited_ask(lambda history: run_agent(history, "Guess the Truth", "game_live"),
+                               session, current_user),
+        render_attachments,
+        request_allowed=st.session_state.request_count < MAX_MESSAGES_PER_SESSION,
+    )
+    st.stop()
 
 # ---------------- chat rendering ----------------
 for i, msg in enumerate(st.session_state.messages):
