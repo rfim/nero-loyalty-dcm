@@ -34,6 +34,7 @@ _sys.path.insert(0, str(_p / "shared"))
 
 import answer_style
 import branding
+import guess_game
 import chat_export
 import chat_store
 
@@ -143,7 +144,11 @@ def run(config: dict):
         st.session_state.tables = {}
 
     with st.sidebar:
-        style, with_chart = answer_style.sidebar_controls(tools)
+        playing = guess_game.mode_selector(config["tools"])
+        if playing:  # game rounds always reveal as a story with a chart
+            style, with_chart = answer_style.STORY, True
+        else:
+            style, with_chart = answer_style.sidebar_controls(tools)
         st.divider()
         st.markdown("### 💬 Conversations")
         if st.button("➕ New chat", use_container_width=True):
@@ -244,6 +249,16 @@ def run(config: dict):
                 render_table(f"{msg_index}_{i}", a["columns"], a["rows"], question)
             else:
                 render_chart(a["spec"])
+
+    if playing:
+        guess_game.render(
+            config["tools"],
+            guess_game.audited_ask(lambda history: run_agent(history, "Guess the Truth", "game_live"),
+                                   session, current_user),
+            render_attachments,
+            request_allowed=st.session_state.request_count < MAX_MESSAGES_PER_SESSION,
+        )
+        return
 
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
