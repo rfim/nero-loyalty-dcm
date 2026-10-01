@@ -123,7 +123,7 @@ ingestion/                Data contract (ingestion/contract/) and the generator 
 analytics/                dbt project: bronze, silver, gold, marts, snapshots, tests, and macros
 account_setup/            Idempotent SQL: roles, grants, warehouses, chatbot stacks, and governance views
 streamlit_apps/           Dashboards, chatbots, and leader-persona applications (snowflake.yml is the deployment manifest)
-curriculum/               Six-module course, "Enterprise AI Assistants: From RAG to Snowflake Cortex" (slides as PDF)
+curriculum/               Six-module course, "Enterprise AI Assistants: From RAG to Snowflake Cortex" (slides, full course and highlights as PDF)
 docs/                     Illustration assets referenced by this document
 ```
 
